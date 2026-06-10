@@ -4,23 +4,23 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#171717" />
-  <meta name="description" content="EasyKnobは、ブラウザで使えるシンプルな声用カラオケエフェクターです。プリセット、CLIP警告、軽いノイズ抑制つきで、DiscordやVRChatで使えます。" />
-  <meta name="keywords" content="EasyKnob, カラオケエフェクター, ボイスエフェクト, マイクエフェクト, プリセット, CLIP警告, ノイズ抑制, Webオーディオ, Discord, VRChat, VB-CABLE, BlackHole" />
+  <meta name="description" content="EasyKnobは、ブラウザで使えるシンプルな声用エフェクトツールです。ノブを回すだけで、声にエコーや響きを追加できます。DiscordやVRChat、通話、配信、オンラインカラオケなどで使えます。" />
+  <meta name="keywords" content="EasyKnob, カラオケエフェクター, エフェクター, ボイスエフェクト, マイクエフェクト, プリセット, CLIP警告, ノイズ抑制, Webオーディオ, Discord, VRChat, VB-CABLE, BlackHole, IGNORANZ-PROJECT, いぐぷろ" />
   <meta name="robots" content="index,follow,max-image-preview:large" />
   <meta name="application-name" content="EasyKnob" />
   <meta name="apple-mobile-web-app-title" content="EasyKnob" />
   <meta property="og:site_name" content="EasyKnob" />
-  <meta property="og:title" content="EasyKnob - ブラウザで使える声用カラオケエフェクター" />
+  <meta property="og:title" content="EasyKnob - ブラウザで使えるシンプルな音声エフェクトツール" />
   <meta property="og:description" content="マイク音声にMIC、ECHO、REVERB、TONE、STABLE、DOUBLEをかけて、VB-CABLEやBlackHoleへ出力できるWebアプリです。プリセットとCLIP警告にも対応します。" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://easyknob.web.app/" />
   <meta property="og:image" content="https://easyknob.web.app/icons/icon-512.png" />
   <meta property="og:locale" content="ja_JP" />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="EasyKnob - ブラウザで使える声用カラオケエフェクター" />
-  <meta name="twitter:description" content="DiscordやVRChatに渡せる、ブラウザ動作のシンプルな声用カラオケエフェクターです。" />
+  <meta name="twitter:title" content="EasyKnob - ブラウザで使えるシンプルな音声エフェクトツール" />
+  <meta name="twitter:description" content="DiscordやVRChatに渡せる、ブラウザ動作のシンプルな音声エフェクトツールです。" />
   <meta name="twitter:image" content="https://easyknob.web.app/icons/icon-512.png" />
-  <title>EasyKnob - ブラウザで使える声用カラオケエフェクター</title>
+  <title>EasyKnob - ブラウザで使えるシンプルな音声エフェクトツール</title>
   <link rel="canonical" href="https://easyknob.web.app/" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icons/icon-192.png" />
@@ -183,8 +183,14 @@
       </section>
 
       <section>
-        <h3>音が変に消える場合</h3>
-        <p>Discord側のノイズ抑制、エコー除去、自動ゲイン調整をOFFにすると、EasyKnobの効果が消されにくくなります。</p>
+        <h3>低遅延・音質</h3>
+        <p>音質を優先する場合は、Discordや配信ソフト側のノイズ抑制、エコー除去、自動ゲイン調整をOFFにしてください。Windows側の音声拡張、空間オーディオ、メーカー製マイク補正もOFF推奨です。</p>
+        <p>EasyKnob側では、不要なSTABLE、ECHO、REVERB、DOUBLEをOFFまたは低めにすると原音に近くなります。AUDIO ANALYZERも不要な時はOFF推奨です。</p>
+      </section>
+
+      <section>
+        <h3>ハウリング対策</h3>
+        <p>スピーカーから出した音をマイクが拾うとハウリングします。基本はヘッドホンか仮想オーディオ出力を使い、スピーカー監視は避けてください。EasyKnobには軽い抑制を入れていますが、完全な防止はできません。</p>
       </section>
 
       <section class="warning-box">

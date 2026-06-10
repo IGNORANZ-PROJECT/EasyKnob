@@ -17,6 +17,8 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.highR = 0;
     this.noiseFloor = 0.005;
     this.noiseGateGain = 1;
+    this.feedbackGuardGain = 1;
+    this.feedbackRisk = 0;
     this.lfo = 0;
     this.frameCount = 0;
     this.processorLoad = 0;
@@ -29,7 +31,13 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
   }
 
   clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-  softLimit(x) { return this.clamp(Math.tanh(x * 1.15) / Math.tanh(1.15), -0.985, 0.985); }
+  softLimit(x) {
+    const ax = Math.abs(x);
+    if (ax <= 0.88) return x;
+    const sign = x < 0 ? -1 : 1;
+    const knee = 0.88 + Math.tanh((ax - 0.88) * 4.2) * 0.105;
+    return sign * this.clamp(knee, 0, 0.985);
+  }
   now() { return globalThis.performance && typeof globalThis.performance.now === 'function' ? globalThis.performance.now() : 0; }
   clearEffectState() {
     this.delayBuffer.fill(0);
@@ -42,6 +50,8 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.highR = 0;
     this.noiseFloor = 0.005;
     this.noiseGateGain = 1;
+    this.feedbackGuardGain = 1;
+    this.feedbackRisk = 0;
   }
   publishStats(startedAt, frameLength, peak, clip = 0) {
     const endedAt = this.now();
@@ -100,11 +110,11 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.micMuted = false;
     const micGain = this.enabled.mic ? mic * 2 : 1;
     const delaySamples = Math.floor(this.sampleRate * (0.115 + echo * 0.38));
-    const feedback = 0.08 + echo * 0.42;
-    const wetEcho = echo * 0.55;
-    const wetRev = reverb * 0.42;
-    const toneLow = 0.055 + (1 - tone) * 0.11;
-    const toneHigh = 0.015 + tone * 0.12;
+    const feedback = 0.06 + echo * 0.34;
+    const wetEcho = echo * 0.48;
+    const wetRev = reverb * 0.36;
+    const toneTilt = (tone - 0.5) * 2;
+    const toneCutoff = 0.065 + Math.abs(toneTilt) * 0.055;
     const compAmount = stable;
     const doubleBase = Math.floor(this.sampleRate * (0.014 + dbl * 0.022));
     const toneOn = this.enabled.tone;
@@ -121,12 +131,17 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
       const mono = (l + r) * 0.5;
 
       if (toneOn) {
-        this.lowL += toneLow * (l - this.lowL);
-        this.lowR += toneLow * (r - this.lowR);
-        const hpL = l - this.highL; this.highL += toneHigh * hpL;
-        const hpR = r - this.highR; this.highR += toneHigh * hpR;
-        l = this.lowL * (1 - tone) + l * 0.7 + hpL * tone * 0.9;
-        r = this.lowR * (1 - tone) + r * 0.7 + hpR * tone * 0.9;
+        this.lowL += toneCutoff * (l - this.lowL);
+        this.lowR += toneCutoff * (r - this.lowR);
+        const brightL = l - this.lowL;
+        const brightR = r - this.lowR;
+        if (toneTilt >= 0) {
+          l += brightL * toneTilt * 0.36;
+          r += brightR * toneTilt * 0.36;
+        } else {
+          l += (this.lowL - l) * -toneTilt * 0.52;
+          r += (this.lowR - r) * -toneTilt * 0.52;
+        }
       } else {
         this.lowL = l;
         this.lowR = r;
@@ -213,7 +228,17 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
         this.doubleIndex = (this.doubleIndex + 1) % this.doubleBuffer.length;
       }
 
-      clip = Math.max(clip, Math.abs(l), Math.abs(r));
+      const preGuardPeak = Math.max(Math.abs(l), Math.abs(r));
+      clip = Math.max(clip, preGuardPeak);
+      this.feedbackRisk = Math.max(preGuardPeak, this.feedbackRisk * 0.9985);
+      let guardTarget = 1;
+      if (this.feedbackRisk > 1.16 || preGuardPeak > 1.16) guardTarget = 0.44;
+      else if (this.feedbackRisk > 0.98 && preGuardPeak > 0.82) guardTarget = 0.68;
+      else if (this.feedbackRisk > 0.88 && preGuardPeak > 0.74) guardTarget = 0.84;
+      const guardSpeed = guardTarget < this.feedbackGuardGain ? 0.075 : 0.0018;
+      this.feedbackGuardGain += (guardTarget - this.feedbackGuardGain) * guardSpeed;
+      l *= this.feedbackGuardGain;
+      r *= this.feedbackGuardGain;
       l = this.softLimit(l);
       r = this.softLimit(r);
       outL[i] = l;

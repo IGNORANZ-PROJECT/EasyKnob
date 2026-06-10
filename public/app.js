@@ -59,6 +59,7 @@ let workletNode = null;
 let analyserNode = null;
 let mediaStream = null;
 let outputDestination = null;
+let contextSinkActive = false;
 let running = false;
 let starting = false;
 let analyzerFrame = 0;
@@ -443,19 +444,7 @@ async function startAudio() {
     if ((state.micDeviceId || micSelect.value) !== 'default' && !micDeviceId) {
       setRunState('starting', 'Defaultで起動中');
     }
-    const constraints = {
-      audio: {
-        deviceId: micDeviceId && micDeviceId !== 'default' ? { exact: micDeviceId } : undefined,
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        latency: { ideal: 0 },
-        sampleRate: { ideal: qualitySampleRate(state.params.quality) },
-        channelCount: { ideal: 1 }
-      },
-      video: false
-    };
-    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+    mediaStream = await openMicStream(micDeviceId);
     await applyLowLatencyTrackConstraints(mediaStream);
     setRunState('starting', '音声準備中');
     await enumerateDevices();
@@ -501,17 +490,55 @@ function createAudioContext() {
   }
 }
 
+async function openMicStream(micDeviceId) {
+  const attempts = [
+    buildMicConstraints(micDeviceId),
+    buildMicConstraints(micDeviceId, { relaxed: true })
+  ];
+  if (micDeviceId) attempts.push(buildMicConstraints(undefined, { relaxed: true }));
+
+  let lastError = null;
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+function buildMicConstraints(micDeviceId, { relaxed = false } = {}) {
+  const audio = {
+    deviceId: micDeviceId && micDeviceId !== 'default' ? { exact: micDeviceId } : undefined,
+    echoCancellation: { ideal: false },
+    noiseSuppression: { ideal: false },
+    autoGainControl: { ideal: false },
+    channelCount: relaxed ? { ideal: 1 } : { ideal: 1, max: 1 }
+  };
+  if (!relaxed) {
+    audio.latency = { ideal: preferredInputLatency(), max: 0.035 };
+    audio.sampleRate = { ideal: qualitySampleRate(state.params.quality) };
+  }
+  return { audio, video: false };
+}
+
 async function applyLowLatencyTrackConstraints(stream) {
   const constraints = {
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl: false,
-    latency: { ideal: 0 },
+    echoCancellation: { ideal: false },
+    noiseSuppression: { ideal: false },
+    autoGainControl: { ideal: false },
+    latency: { ideal: preferredInputLatency(), max: 0.035 },
     channelCount: { ideal: 1 }
   };
   await Promise.all(stream.getAudioTracks().map((track) => {
     if (!track.applyConstraints) return Promise.resolve();
-    return track.applyConstraints(constraints).catch(() => {});
+    return track.applyConstraints(constraints).catch(() => track.applyConstraints({
+      echoCancellation: { ideal: false },
+      noiseSuppression: { ideal: false },
+      autoGainControl: { ideal: false },
+      channelCount: { ideal: 1 }
+    }).catch(() => {}));
   }));
 }
 
@@ -537,7 +564,7 @@ function startupErrorMessage(error) {
 
 function connectOutputGraph() {
   if (!audioContext || !workletNode || !outputDestination) return;
-  const target = useDirectOutputRoute() ? audioContext.destination : outputDestination;
+  const target = useDirectOutputRoute() || contextSinkActive ? audioContext.destination : outputDestination;
   try { workletNode.disconnect(); } catch {}
   if (analyserNode) {
     try { analyserNode.disconnect(); } catch {}
@@ -566,7 +593,7 @@ function useDirectOutputRoute() {
 async function syncOutputRoute() {
   if (!audioContext || !workletNode || !outputDestination) return;
   connectOutputGraph();
-  if (useDirectOutputRoute()) {
+  if (useDirectOutputRoute() || contextSinkActive) {
     monitor.pause();
     monitor.srcObject = null;
     return;
@@ -617,6 +644,7 @@ async function stopAudio({ showIdle = true } = {}) {
   analyserNode = null;
   mediaStream = null;
   outputDestination = null;
+  contextSinkActive = false;
   if (showIdle) {
     setRunState('idle', 'READY');
     clearRuntimeError();
@@ -631,8 +659,22 @@ async function restartAudio() {
 }
 
 async function applyOutputDevice({ allowFallback = false } = {}) {
+  const requested = state.outputDeviceId || outputSelect.value;
+  const missing = requested && requested !== 'default' && !availableOutputDeviceIds.has(requested);
+  const id = missing ? '' : selectedOutputDeviceId();
+  contextSinkActive = false;
+
+  if (audioContext && typeof audioContext.setSinkId === 'function' && !missing) {
+    try {
+      await audioContext.setSinkId(id);
+      contextSinkActive = true;
+      return true;
+    } catch {
+      contextSinkActive = false;
+    }
+  }
+
   if (!monitor.setSinkId) {
-    const requested = state.outputDeviceId || outputSelect.value;
     if (requested && requested !== 'default' && allowFallback) {
       state.outputDeviceId = '';
       outputSelect.value = 'default';
@@ -641,9 +683,6 @@ async function applyOutputDevice({ allowFallback = false } = {}) {
     }
     return true;
   }
-  const requested = state.outputDeviceId || outputSelect.value;
-  const missing = requested && requested !== 'default' && !availableOutputDeviceIds.has(requested);
-  const id = missing ? '' : selectedOutputDeviceId();
   try {
     await monitor.setSinkId(id);
     if (missing && allowFallback) {
@@ -915,9 +954,17 @@ function qualitySampleRate(q) {
 }
 
 function qualityLatency(q) {
-  if (q === 'light') return 0.012;
-  if (q === 'balanced') return 0.008;
-  return 0.005;
+  if (q === 'light') return 0.01;
+  if (q === 'balanced') return 0.006;
+  return 0.003;
+}
+
+function preferredInputLatency() {
+  return isWindowsPlatform() ? 0.004 : 0.003;
+}
+
+function isWindowsPlatform() {
+  return /Windows|Win32|Win64|WOW64/i.test(`${navigator.userAgent} ${navigator.platform || ''}`);
 }
 
 function clamp(v, lo, hi) {
