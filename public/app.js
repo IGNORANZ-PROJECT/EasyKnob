@@ -1,6 +1,7 @@
 const DEFAULTS = {
   params: { mic: 0.5, echo: 0.25, reverb: 0.2, tone: 0.5, stable: 0.3, double: 0, quality: 'maximum' },
   enabled: { mic: true, echo: true, reverb: true, tone: true, stable: true, double: true },
+  bypassed: { mic: false, echo: false, reverb: false, tone: false, stable: false, double: false },
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
   micDeviceId: 'default',
@@ -12,7 +13,7 @@ const KNOBS = [
   { key: 'echo', label: 'ECHO', desc: '声が遅れて返ってくる量。カラオケらしい「やまびこ感」を作ります。' },
   { key: 'reverb', label: 'REVERB', desc: '空間の響き。部屋やホールで歌っているような広がりを加えます。' },
   { key: 'tone', label: 'TONE', desc: '声の明るさ。左で柔らかく、右でクリアにします。' },
-  { key: 'stable', label: 'STABLE', desc: '声の音量差を整えます。小さい声を聞きやすくし、大きすぎる声を抑えます。' },
+  { key: 'stable', label: 'STABLE', desc: '声の音量差を整え、床ノイズを控えめに抑えます。小さい声を聞きやすくし、大きすぎる声を抑えます。' },
   { key: 'double', label: 'DOUBLE', desc: '声を少し重ねて厚みを出します。歌声をリッチにしたい時に使います。' }
 ];
 
@@ -80,6 +81,7 @@ function loadState() {
       ...parsed,
       params: { ...DEFAULTS.params, ...parsed.params },
       enabled: { ...DEFAULTS.enabled, ...migratedEnabled },
+      bypassed: { ...DEFAULTS.bypassed, ...parsed.bypassed },
       analyzerEnabled: analyzerPreferenceSet ? (parsed.analyzerEnabled ?? DEFAULTS.analyzerEnabled) : DEFAULTS.analyzerEnabled,
       analyzerPreferenceSet
     };
@@ -143,6 +145,7 @@ function bindUi() {
   $('helpBtn').addEventListener('click', () => $('helpDialog').showModal());
   $('restoreKnobsBtn').addEventListener('click', () => {
     state.enabled = structuredClone(DEFAULTS.enabled);
+    state.bypassed = structuredClone(DEFAULTS.bypassed);
     saveState();
     renderKnobs();
     renderSettings();
@@ -165,6 +168,7 @@ function bindUi() {
     state.outputDeviceId = outputSelect.value;
     saveState();
     const switched = await applyOutputDevice({ allowFallback: true });
+    if (running) await syncOutputRoute();
     if (switched) clearRuntimeError();
     else showRuntimeError('選択したOutputを使えませんでした。Default Outputに戻しました。');
   });
@@ -183,18 +187,19 @@ function renderKnobs() {
   for (const knob of KNOBS) {
     if (!state.enabled[knob.key]) continue;
     const value = state.params[knob.key];
+    const active = isKnobActive(knob.key);
     const card = document.createElement('article');
-    card.className = 'knob-card';
+    card.className = `knob-card${active ? '' : ' bypassed'}`;
     card.innerHTML = `
       <div class="knob-head">
         <div class="knob-name">${knob.label}</div>
-        <span class="knob-state">ON</span>
+        <button class="knob-state${active ? '' : ' off'}" type="button" aria-pressed="${active ? 'true' : 'false'}" aria-label="${knob.label} ${active ? '無効化' : '有効化'}">${active ? 'ON' : 'OFF'}</button>
       </div>
-      <div class="knob" role="slider" tabindex="0" aria-label="${knob.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(value * 100)}" aria-disabled="false">
+      <div class="knob" role="slider" tabindex="${active ? '0' : '-1'}" aria-label="${knob.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(value * 100)}" aria-disabled="${active ? 'false' : 'true'}">
         <span class="knob-pointer" aria-hidden="true"></span>
       </div>
       <div class="knob-control">
-        <input class="knob-input" type="range" min="0" max="100" value="${Math.round(value * 100)}" aria-label="${knob.label}" />
+        <input class="knob-input" type="range" min="0" max="100" value="${Math.round(value * 100)}" aria-label="${knob.label}" ${active ? '' : 'disabled'} />
         <div class="knob-value">${Math.round(value * 100)}%</div>
       </div>
     `;
@@ -213,12 +218,14 @@ function renderKnobs() {
 function bindKnobControl(card, knob) {
   const dial = card.querySelector('.knob');
   const range = card.querySelector('input');
+  const stateButton = card.querySelector('.knob-state');
+  stateButton.addEventListener('click', () => toggleKnobBypass(knob.key));
   range.addEventListener('input', () => {
     setKnobValue(knob.key, card, Number(range.value) / 100);
   });
 
   const updateFromPointer = (event) => {
-    if (!state.enabled[knob.key]) return;
+    if (!isKnobActive(knob.key)) return;
     const rect = dial.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
@@ -232,7 +239,7 @@ function bindKnobControl(card, knob) {
   };
 
   dial.addEventListener('pointerdown', (event) => {
-    if (!state.enabled[knob.key]) return;
+    if (!isKnobActive(knob.key)) return;
     dial.focus();
     event.preventDefault();
     dial.setPointerCapture(event.pointerId);
@@ -245,7 +252,7 @@ function bindKnobControl(card, knob) {
     if (dial.hasPointerCapture(event.pointerId)) dial.releasePointerCapture(event.pointerId);
   });
   dial.addEventListener('keydown', (event) => {
-    if (!state.enabled[knob.key]) return;
+    if (!isKnobActive(knob.key)) return;
     const keySteps = { ArrowUp: 0.02, ArrowRight: 0.02, ArrowDown: -0.02, ArrowLeft: -0.02, PageUp: 0.1, PageDown: -0.1 };
     if (event.key === 'Home') {
       event.preventDefault();
@@ -262,6 +269,19 @@ function bindKnobControl(card, knob) {
       setKnobValue(knob.key, card, state.params[knob.key] + keySteps[event.key]);
     }
   });
+}
+
+function isKnobActive(key) {
+  return state.enabled[key] && !state.bypassed[key];
+}
+
+function toggleKnobBypass(key) {
+  if (!state.enabled[key]) return;
+  state.bypassed[key] = !state.bypassed[key];
+  saveState();
+  renderKnobs();
+  sendEnabled();
+  renderRuntimeStats();
 }
 
 function setKnobValue(key, card, rawValue) {
@@ -299,6 +319,7 @@ function renderSettings() {
     `;
     item.querySelector('input').addEventListener('change', (event) => {
       state.enabled[knob.key] = event.target.checked;
+      state.bypassed[knob.key] = false;
       saveState();
       renderKnobs();
       renderSettings();
@@ -372,11 +393,14 @@ async function startAudio() {
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
-        channelCount: { ideal: 2 }
+        latency: { ideal: 0 },
+        sampleRate: { ideal: qualitySampleRate(state.params.quality) },
+        channelCount: { ideal: 1 }
       },
       video: false
     };
     mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+    await applyLowLatencyTrackConstraints(mediaStream);
     setRunState('starting', '音声準備中');
     await enumerateDevices();
     audioContext = createAudioContext();
@@ -386,11 +410,10 @@ async function startAudio() {
     workletNode = new AudioWorkletNode(audioContext, 'easyknob-processor', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
     outputDestination = audioContext.createMediaStreamDestination();
     sourceNode.connect(workletNode);
-    connectOutputGraph();
     monitor.srcObject = outputDestination.stream;
     monitor.muted = false;
     const outputReady = await applyOutputDevice({ allowFallback: true });
-    await monitor.play();
+    await syncOutputRoute();
     workletNode.port.onmessage = (event) => handleWorkletMessage(event.data);
     sendParams();
     sendEnabled();
@@ -418,8 +441,22 @@ function createAudioContext() {
   try {
     return new AudioContext({ sampleRate: qualitySampleRate(state.params.quality), latencyHint });
   } catch {
-    return new AudioContext({ latencyHint });
+    return new AudioContext({ latencyHint: 'interactive' });
   }
+}
+
+async function applyLowLatencyTrackConstraints(stream) {
+  const constraints = {
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+    latency: { ideal: 0 },
+    channelCount: { ideal: 1 }
+  };
+  await Promise.all(stream.getAudioTracks().map((track) => {
+    if (!track.applyConstraints) return Promise.resolve();
+    return track.applyConstraints(constraints).catch(() => {});
+  }));
 }
 
 function startupErrorMessage(error) {
@@ -444,6 +481,7 @@ function startupErrorMessage(error) {
 
 function connectOutputGraph() {
   if (!audioContext || !workletNode || !outputDestination) return;
+  const target = useDirectOutputRoute() ? audioContext.destination : outputDestination;
   try { workletNode.disconnect(); } catch {}
   if (analyserNode) {
     try { analyserNode.disconnect(); } catch {}
@@ -454,14 +492,34 @@ function connectOutputGraph() {
     analyserNode.fftSize = 1024;
     analyserNode.smoothingTimeConstant = 0.72;
     workletNode.connect(analyserNode);
-    analyserNode.connect(outputDestination);
+    analyserNode.connect(target);
     startAnalyzer();
   } else {
-    workletNode.connect(outputDestination);
+    workletNode.connect(target);
     stopAnalyzer();
     drawAnalyzerIdle();
   }
   renderAnalyzerVisibility();
+}
+
+function useDirectOutputRoute() {
+  const selected = state.outputDeviceId || outputSelect.value;
+  return !selected || selected === 'default';
+}
+
+async function syncOutputRoute() {
+  if (!audioContext || !workletNode || !outputDestination) return;
+  connectOutputGraph();
+  if (useDirectOutputRoute()) {
+    monitor.pause();
+    monitor.srcObject = null;
+    return;
+  }
+  if (monitor.srcObject !== outputDestination.stream) {
+    monitor.srcObject = outputDestination.stream;
+  }
+  monitor.muted = false;
+  await monitor.play();
 }
 
 function handleWorkletMessage(data) {
@@ -513,7 +571,16 @@ async function restartAudio() {
 }
 
 async function applyOutputDevice({ allowFallback = false } = {}) {
-  if (!monitor.setSinkId) return true;
+  if (!monitor.setSinkId) {
+    const requested = state.outputDeviceId || outputSelect.value;
+    if (requested && requested !== 'default' && allowFallback) {
+      state.outputDeviceId = '';
+      outputSelect.value = 'default';
+      saveState();
+      return false;
+    }
+    return true;
+  }
   const requested = state.outputDeviceId || outputSelect.value;
   const missing = requested && requested !== 'default' && !availableOutputDeviceIds.has(requested);
   const id = missing ? '' : selectedOutputDeviceId();
@@ -545,7 +612,11 @@ function sendParams() {
 
 function sendEnabled() {
   if (!workletNode) return;
-  workletNode.port.postMessage({ type: 'enabled', enabled: state.enabled });
+  workletNode.port.postMessage({ type: 'enabled', enabled: effectiveEnabled() });
+}
+
+function effectiveEnabled() {
+  return Object.fromEntries(KNOBS.map(knob => [knob.key, isKnobActive(knob.key)]));
 }
 
 function renderAnalyzerVisibility() {
@@ -693,10 +764,9 @@ function qualitySampleRate(q) {
 }
 
 function qualityLatency(q) {
-  if (q === 'maximum') return 'interactive';
-  if (q === 'high') return 'interactive';
-  if (q === 'balanced') return 'balanced';
-  return 'playback';
+  if (q === 'light') return 0.012;
+  if (q === 'balanced') return 0.008;
+  return 0.005;
 }
 
 function clamp(v, lo, hi) {
