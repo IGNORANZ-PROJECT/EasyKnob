@@ -60,6 +60,8 @@ let analyserNode = null;
 let mediaStream = null;
 let outputDestination = null;
 let contextSinkActive = false;
+let contextSinkPreselected = false;
+let contextSinkId = '';
 let running = false;
 let starting = false;
 let analyzerFrame = 0;
@@ -483,8 +485,26 @@ async function startAudio() {
 
 function createAudioContext() {
   const latencyHint = qualityLatency(state.params.quality);
+  const sampleRate = qualitySampleRate(state.params.quality);
+  const sinkId = selectedOutputDeviceId();
+  contextSinkActive = false;
+  contextSinkPreselected = false;
+  contextSinkId = '';
+  if (sinkId && typeof AudioContext.prototype.setSinkId === 'function') {
+    try {
+      const context = new AudioContext({ sampleRate, latencyHint, sinkId });
+      contextSinkActive = true;
+      contextSinkPreselected = true;
+      contextSinkId = sinkId;
+      return context;
+    } catch {
+      contextSinkActive = false;
+      contextSinkPreselected = false;
+      contextSinkId = '';
+    }
+  }
   try {
-    return new AudioContext({ sampleRate: qualitySampleRate(state.params.quality), latencyHint });
+    return new AudioContext({ sampleRate, latencyHint });
   } catch {
     return new AudioContext({ latencyHint: 'interactive' });
   }
@@ -517,7 +537,7 @@ function buildMicConstraints(micDeviceId, { relaxed = false } = {}) {
     channelCount: relaxed ? { ideal: 1 } : { ideal: 1, max: 1 }
   };
   if (!relaxed) {
-    audio.latency = { ideal: preferredInputLatency(), max: 0.035 };
+    audio.latency = { ideal: preferredInputLatency(), max: 0.02 };
     audio.sampleRate = { ideal: qualitySampleRate(state.params.quality) };
   }
   return { audio, video: false };
@@ -528,7 +548,7 @@ async function applyLowLatencyTrackConstraints(stream) {
     echoCancellation: { ideal: false },
     noiseSuppression: { ideal: false },
     autoGainControl: { ideal: false },
-    latency: { ideal: preferredInputLatency(), max: 0.035 },
+    latency: { ideal: preferredInputLatency(), max: 0.02 },
     channelCount: { ideal: 1 }
   };
   await Promise.all(stream.getAudioTracks().map((track) => {
@@ -645,6 +665,8 @@ async function stopAudio({ showIdle = true } = {}) {
   mediaStream = null;
   outputDestination = null;
   contextSinkActive = false;
+  contextSinkPreselected = false;
+  contextSinkId = '';
   if (showIdle) {
     setRunState('idle', 'READY');
     clearRuntimeError();
@@ -662,16 +684,24 @@ async function applyOutputDevice({ allowFallback = false } = {}) {
   const requested = state.outputDeviceId || outputSelect.value;
   const missing = requested && requested !== 'default' && !availableOutputDeviceIds.has(requested);
   const id = missing ? '' : selectedOutputDeviceId();
+  const preselected = contextSinkPreselected && contextSinkId === id && !missing;
   contextSinkActive = false;
 
   if (audioContext && typeof audioContext.setSinkId === 'function' && !missing) {
     try {
       await audioContext.setSinkId(id);
       contextSinkActive = true;
+      contextSinkPreselected = false;
+      contextSinkId = id;
       return true;
     } catch {
       contextSinkActive = false;
     }
+  }
+
+  if (preselected) {
+    contextSinkActive = true;
+    return true;
   }
 
   if (!monitor.setSinkId) {
@@ -954,13 +984,13 @@ function qualitySampleRate(q) {
 }
 
 function qualityLatency(q) {
-  if (q === 'light') return 0.01;
-  if (q === 'balanced') return 0.006;
-  return 0.003;
+  if (q === 'light') return 0.008;
+  if (q === 'balanced') return 0.004;
+  return 0.0015;
 }
 
 function preferredInputLatency() {
-  return isWindowsPlatform() ? 0.004 : 0.003;
+  return isWindowsPlatform() ? 0.002 : 0.0025;
 }
 
 function isWindowsPlatform() {
