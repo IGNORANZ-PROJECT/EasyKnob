@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#171717" />
+  <meta name="description" content="EasyKnobは、ブラウザで使えるシンプルな声用カラオケエフェクターです。VB-CABLEやBlackHoleへ出力し、DiscordやVRChatで使えます。" />
+  <meta name="keywords" content="EasyKnob, カラオケエフェクター, ボイスエフェクト, マイクエフェクト, Webオーディオ, Discord, VRChat, VB-CABLE, BlackHole" />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta name="application-name" content="EasyKnob" />
+  <meta name="apple-mobile-web-app-title" content="EasyKnob" />
+  <meta property="og:site_name" content="EasyKnob" />
+  <meta property="og:title" content="EasyKnob - ブラウザで使える声用カラオケエフェクター" />
+  <meta property="og:description" content="マイク音声にMIC、ECHO、REVERB、TONE、STABLE、DOUBLEをかけて、VB-CABLEやBlackHoleへ出力できるWebアプリです。" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://easyknob.web.app/" />
+  <meta property="og:image" content="https://easyknob.web.app/icons/icon-512.png" />
+  <meta property="og:locale" content="ja_JP" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="EasyKnob - ブラウザで使える声用カラオケエフェクター" />
+  <meta name="twitter:description" content="DiscordやVRChatに渡せる、ブラウザ動作のシンプルな声用カラオケエフェクターです。" />
+  <meta name="twitter:image" content="https://easyknob.web.app/icons/icon-512.png" />
+  <title>EasyKnob - ブラウザで使える声用カラオケエフェクター</title>
+  <link rel="canonical" href="https://easyknob.web.app/" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "EasyKnob",
+    "alternateName": "EasyKnob Web Karaoke Voice Effects",
+    "description": "EasyKnobは、ブラウザで使える声用カラオケエフェクターです。マイク音声にMIC、ECHO、REVERB、TONE、STABLE、DOUBLEをかけ、VB-CABLEやBlackHoleへ出力できます。",
+    "url": "https://easyknob.web.app/",
+    "image": "https://easyknob.web.app/icons/icon-512.png",
+    "codeRepository": "https://github.com/IGNORANZ-PROJECT/EasyKnob",
+    "license": "https://opensource.org/licenses/MIT",
+    "copyrightHolder": {
+      "@type": "Organization",
+      "name": "IGNORANZ PROJECT"
+    },
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Windows, macOS",
+    "browserRequirements": "Chrome or Edge with Web Audio API support",
+    "inLanguage": "ja",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "JPY"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Web Karaoke Voice Effects</p>
+        <h1>EasyKnob</h1>
+      </div>
+      <div class="top-actions">
+        <button id="helpBtn" class="ghost" type="button">HELP</button>
+        <button id="settingsBtn" class="ghost" type="button">設定</button>
+      </div>
+    </header>
+
+    <section id="supportBanner" class="banner hidden" aria-live="polite"></section>
+
+    <main class="panel">
+      <section class="routing-card">
+        <div class="field">
+          <label for="micSelect">Input</label>
+          <select id="micSelect"></select>
+        </div>
+        <div class="field">
+          <label for="outputSelect">Output</label>
+          <select id="outputSelect"></select>
+        </div>
+        <div class="field compact">
+          <label for="qualitySelect">Quality</label>
+          <select id="qualitySelect">
+            <option value="maximum">Maximum</option>
+            <option value="high">High</option>
+            <option value="balanced">Balanced</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="status-row">
+        <button id="startBtn" class="power" type="button">ON</button>
+        <button id="resetBtn" class="ghost" type="button">RESET</button>
+        <div id="runStatus" class="run-status" data-state="idle" aria-live="polite">
+          <strong id="runState">READY</strong>
+          <span id="loadValue">LOAD --</span>
+        </div>
+        <div class="meter-wrap" aria-label="入力音量メーター">
+          <span>MIC LEVEL</span>
+          <div class="meter"><div id="meterBar"></div></div>
+        </div>
+      </section>
+
+      <section id="analyzerPanel" class="analyzer-panel hidden" aria-label="Audio analyzer">
+        <canvas id="analyzerCanvas" aria-label="オーディオアナライザ"></canvas>
+      </section>
+
+      <section id="knobGrid" class="knob-grid" aria-label="Effect knobs"></section>
+    </main>
+
+    <footer class="site-footer">
+      <a href="https://github.com/IGNORANZ-PROJECT/EasyKnob" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="https://ignoranz-project.web.app" target="_blank" rel="noreferrer">©IGNORANZ PROJECT</a>
+    </footer>
+  </div>
+
+  <dialog id="settingsDialog" class="modal">
+    <form method="dialog" class="modal-card">
+      <header>
+        <h2>設定</h2>
+        <button class="icon-btn" value="close" aria-label="閉じる">×</button>
+      </header>
+      <p class="muted">ノブを無効化すると、メイン画面から隠し、音声処理から外します。</p>
+      <label class="setting-item analyzer-setting">
+        <input id="analyzerToggle" type="checkbox" />
+        <span><strong>AUDIO ANALYZER</strong><p>周波数バーと波形の表示を切り替えます。</p></span>
+        <em id="analyzerState">OFF</em>
+      </label>
+      <div id="knobSettings" class="settings-list"></div>
+      <menu>
+        <button id="restoreKnobsBtn" class="ghost" type="button">全ノブを有効</button>
+        <button class="primary" value="close">閉じる</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="helpDialog" class="modal">
+    <form method="dialog" class="modal-card help-card">
+      <header>
+        <h2>HELP</h2>
+        <button class="icon-btn" value="close" aria-label="閉じる">×</button>
+      </header>
+
+      <section>
+        <h3>まず必要なもの</h3>
+        <p>EasyKnob本体はブラウザで動きます。ただしDiscordやVRChatに渡すには、仮想オーディオが必要です。</p>
+        <ul>
+          <li>Windows: VB-CABLE</li>
+          <li>Mac: BlackHole</li>
+          <li>推奨ブラウザ: Chrome / Edge</li>
+        </ul>
+      </section>
+
+      <section>
+        <h3>Windows / VB-CABLE</h3>
+        <ol>
+          <li>VB-CABLEをインストールします。</li>
+          <li>EasyKnobのOutputを <strong>CABLE Input</strong> にします。</li>
+          <li>Discordなどの入力を <strong>CABLE Output</strong> にします。</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>Mac / BlackHole</h3>
+        <ol>
+          <li>BlackHoleをインストールします。</li>
+          <li>EasyKnobのOutputを <strong>BlackHole</strong> にします。</li>
+          <li>Discordなどの入力を <strong>BlackHole</strong> にします。</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>音が変に消える場合</h3>
+        <p>Discord側のノイズ抑制、エコー除去、自動ゲイン調整をOFFにすると、EasyKnobの効果が消されにくくなります。</p>
+      </section>
+
+      <section class="warning-box">
+        <h3>対応外環境について</h3>
+        <p>Safariや一部ブラウザでは、出力先デバイスの選択が使えない場合があります。対応外環境では、EasyKnobを仮想マイク用途に使えない可能性があります。</p>
+      </section>
+
+      <menu>
+        <button class="primary" value="close">閉じる</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <audio id="monitor" autoplay playsinline></audio>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

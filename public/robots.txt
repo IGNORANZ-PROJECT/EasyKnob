@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://easyknob.web.app/sitemap.xml
