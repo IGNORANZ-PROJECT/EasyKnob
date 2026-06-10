@@ -29,7 +29,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
   }
 
   clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-  softLimit(x) { return Math.tanh(x * 1.15) / Math.tanh(1.15); }
+  softLimit(x) { return this.clamp(Math.tanh(x * 1.15) / Math.tanh(1.15), -0.985, 0.985); }
   now() { return globalThis.performance && typeof globalThis.performance.now === 'function' ? globalThis.performance.now() : 0; }
   clearEffectState() {
     this.delayBuffer.fill(0);
@@ -43,7 +43,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.noiseFloor = 0.005;
     this.noiseGateGain = 1;
   }
-  publishStats(startedAt, frameLength, peak) {
+  publishStats(startedAt, frameLength, peak, clip = 0) {
     const endedAt = this.now();
     const bufferMs = frameLength / this.sampleRate * 1000;
     if (startedAt && endedAt) {
@@ -52,7 +52,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     }
     this.frameCount++;
     if (this.frameCount % 6 === 0) {
-      this.port.postMessage({ type: 'stats', peak, load: this.processorLoad, bufferMs });
+      this.port.postMessage({ type: 'stats', peak, clip, load: this.processorLoad, bufferMs });
     }
   }
 
@@ -114,6 +114,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     const doubleOn = this.enabled.double && dbl > 0.001;
 
     let peak = 0;
+    let clip = 0;
     for (let i = 0; i < outL.length; i++) {
       let l = inL[i] * micGain;
       let r = inR[i] * micGain;
@@ -212,6 +213,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
         this.doubleIndex = (this.doubleIndex + 1) % this.doubleBuffer.length;
       }
 
+      clip = Math.max(clip, Math.abs(l), Math.abs(r));
       l = this.softLimit(l);
       r = this.softLimit(r);
       outL[i] = l;
@@ -219,7 +221,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
       peak = Math.max(peak, Math.abs(l), Math.abs(r));
     }
 
-    this.publishStats(startedAt, outL.length, peak);
+    this.publishStats(startedAt, outL.length, peak, clip);
     return true;
   }
 }

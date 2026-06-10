@@ -2,6 +2,8 @@ const DEFAULTS = {
   params: { mic: 0.5, echo: 0.25, reverb: 0.2, tone: 0.5, stable: 0.3, double: 0, quality: 'maximum' },
   enabled: { mic: true, echo: true, reverb: true, tone: true, stable: true, double: true },
   bypassed: { mic: false, echo: false, reverb: false, tone: false, stable: false, double: false },
+  preset: 'default',
+  presetOverrides: {},
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
   micDeviceId: 'default',
@@ -17,6 +19,39 @@ const KNOBS = [
   { key: 'double', label: 'DOUBLE', desc: '声を少し重ねて厚みを出します。歌声をリッチにしたい時に使います。' }
 ];
 
+const PRESETS = {
+  default: {
+    label: 'Default',
+    params: { mic: 0.5, echo: 0.25, reverb: 0.2, tone: 0.5, stable: 0.3, double: 0 },
+    bypassed: { ...DEFAULTS.bypassed }
+  },
+  singing: {
+    label: 'Sing',
+    params: { mic: 0.52, echo: 0.34, reverb: 0.32, tone: 0.58, stable: 0.42, double: 0.12 },
+    bypassed: { ...DEFAULTS.bypassed }
+  },
+  talk: {
+    label: 'Talk',
+    params: { mic: 0.5, echo: 0, reverb: 0, tone: 0.55, stable: 0.5, double: 0 },
+    bypassed: { mic: false, echo: true, reverb: true, tone: false, stable: false, double: true }
+  },
+  preset1: {
+    label: 'Preset 1',
+    params: { mic: 0.48, echo: 0.14, reverb: 0.12, tone: 0.54, stable: 0.44, double: 0.08 },
+    bypassed: { ...DEFAULTS.bypassed }
+  },
+  preset2: {
+    label: 'Preset 2',
+    params: { mic: 0.46, echo: 0.06, reverb: 0.08, tone: 0.62, stable: 0.58, double: 0 },
+    bypassed: { mic: false, echo: false, reverb: false, tone: false, stable: false, double: true }
+  },
+  preset3: {
+    label: 'Preset 3',
+    params: { mic: 0.52, echo: 0.42, reverb: 0.38, tone: 0.6, stable: 0.36, double: 0.18 },
+    bypassed: { ...DEFAULTS.bypassed }
+  }
+};
+
 let state = loadState();
 let audioContext = null;
 let sourceNode = null;
@@ -29,8 +64,9 @@ let starting = false;
 let analyzerFrame = 0;
 let frequencyData = null;
 let timeData = null;
-let latestStats = { load: 0, peak: 0, bufferMs: 0 };
+let latestStats = { load: 0, peak: 0, bufferMs: 0, clip: 0 };
 let statsReceived = false;
+let clipUntil = 0;
 let supportMessage = '';
 let runtimeMessage = '';
 let availableMicDeviceIds = new Set();
@@ -41,9 +77,11 @@ const knobGrid = $('knobGrid');
 const micSelect = $('micSelect');
 const outputSelect = $('outputSelect');
 const qualitySelect = $('qualitySelect');
+const presetSelect = $('presetSelect');
 const startBtn = $('startBtn');
 const resetBtn = $('resetBtn');
 const meterBar = $('meterBar');
+const clipWarning = $('clipWarning');
 const monitor = $('monitor');
 const supportBanner = $('supportBanner');
 const runStatus = $('runStatus');
@@ -61,6 +99,7 @@ async function init() {
   renderSettings();
   bindUi();
   qualitySelect.value = state.params.quality;
+  renderPresetSelect();
   setRunState('idle', 'READY');
   checkSupport();
   renderAnalyzerVisibility();
@@ -76,12 +115,22 @@ function loadState() {
     const parsed = JSON.parse(raw);
     const migratedEnabled = parsed.enabled || parsed.visible || DEFAULTS.enabled;
     const analyzerPreferenceSet = parsed.analyzerPreferenceSet === true;
+    const preset = normalizePreset(parsed.preset);
+    const presetOverrides = sanitizePresetOverrides(parsed.presetOverrides);
+    if (!presetOverrides[preset] && parsed.params) {
+      presetOverrides[preset] = {
+        params: sanitizePresetParams(parsed.params),
+        bypassed: sanitizePresetBypassed(parsed.bypassed, { ...DEFAULTS.bypassed, ...PRESETS[preset].bypassed })
+      };
+    }
     return {
       ...structuredClone(DEFAULTS),
       ...parsed,
       params: { ...DEFAULTS.params, ...parsed.params },
       enabled: { ...DEFAULTS.enabled, ...migratedEnabled },
       bypassed: { ...DEFAULTS.bypassed, ...parsed.bypassed },
+      preset,
+      presetOverrides,
       analyzerEnabled: analyzerPreferenceSet ? (parsed.analyzerEnabled ?? DEFAULTS.analyzerEnabled) : DEFAULTS.analyzerEnabled,
       analyzerPreferenceSet
     };
@@ -135,10 +184,12 @@ function bindUi() {
     else await startAudio();
   });
   resetBtn.addEventListener('click', () => {
-    state.params = { ...DEFAULTS.params, quality: state.params.quality };
+    resetCurrentPreset();
     saveState();
+    renderPresetSelect();
     renderKnobs();
     sendParams();
+    sendEnabled();
     renderRuntimeStats();
   });
   $('settingsBtn').addEventListener('click', () => $('settingsDialog').showModal());
@@ -147,6 +198,7 @@ function bindUi() {
     state.enabled = structuredClone(DEFAULTS.enabled);
     state.bypassed = structuredClone(DEFAULTS.bypassed);
     saveState();
+    renderPresetSelect();
     renderKnobs();
     renderSettings();
     sendEnabled();
@@ -179,6 +231,7 @@ function bindUi() {
     renderRuntimeStats();
     if (running) await restartAudio();
   });
+  presetSelect.addEventListener('change', () => applyPreset(presetSelect.value));
   window.addEventListener('resize', drawAnalyzerIdle);
 }
 
@@ -278,6 +331,7 @@ function isKnobActive(key) {
 function toggleKnobBypass(key) {
   if (!state.enabled[key]) return;
   state.bypassed[key] = !state.bypassed[key];
+  saveCurrentPreset();
   saveState();
   renderKnobs();
   sendEnabled();
@@ -288,6 +342,7 @@ function setKnobValue(key, card, rawValue) {
   const value = clamp(rawValue, 0, 1);
   state.params[key] = value;
   applyKnobUi(card, value);
+  saveCurrentPreset();
   saveState();
   sendParams();
 }
@@ -376,7 +431,8 @@ async function startAudio() {
   startBtn.textContent = '起動中';
   startBtn.classList.remove('active');
   statsReceived = false;
-  latestStats = { load: 0, peak: 0, bufferMs: 0 };
+  latestStats = { load: 0, peak: 0, bufferMs: 0, clip: 0 };
+  clipUntil = 0;
   setRunState('starting', 'マイク許可待ち');
   clearRuntimeError();
   renderRuntimeStats();
@@ -527,9 +583,12 @@ function handleWorkletMessage(data) {
   latestStats = {
     load: Number.isFinite(data.load) ? data.load : latestStats.load,
     peak: Number.isFinite(data.peak) ? data.peak : latestStats.peak,
-    bufferMs: Number.isFinite(data.bufferMs) ? data.bufferMs : latestStats.bufferMs
+    bufferMs: Number.isFinite(data.bufferMs) ? data.bufferMs : latestStats.bufferMs,
+    clip: Number.isFinite(data.clip) ? data.clip : latestStats.clip
   };
   statsReceived = true;
+  const clipping = latestStats.clip >= 0.96 || latestStats.peak >= 0.98;
+  if (clipping) clipUntil = performance.now() + 900;
   meterBar.style.width = `${Math.min(100, latestStats.peak * 110)}%`;
   renderRuntimeStats();
 }
@@ -541,8 +600,9 @@ async function stopAudio({ showIdle = true } = {}) {
   startBtn.textContent = 'ON';
   startBtn.classList.remove('active');
   meterBar.style.width = '0%';
-  latestStats = { load: 0, peak: 0, bufferMs: 0 };
+  latestStats = { load: 0, peak: 0, bufferMs: 0, clip: 0 };
   statsReceived = false;
+  clipUntil = 0;
   stopAnalyzer();
   if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
   try { if (sourceNode) sourceNode.disconnect(); } catch {}
@@ -745,6 +805,7 @@ function drawIdleGrid(ctx, width, height) {
 }
 
 function renderRuntimeStats() {
+  renderClipWarning();
   if (!running) {
     loadValue.textContent = 'LOAD --';
     return;
@@ -755,6 +816,96 @@ function renderRuntimeStats() {
   }
   const load = Math.min(99, Math.round(latestStats.load * 100));
   loadValue.textContent = load <= 0 ? 'LOAD <1%' : `LOAD ${load}%`;
+}
+
+function renderClipWarning() {
+  const visible = running && performance.now() < clipUntil;
+  clipWarning.classList.toggle('hidden', !visible);
+  meterBar.classList.toggle('clipping', visible);
+}
+
+function renderPresetSelect() {
+  state.preset = normalizePreset(state.preset);
+  presetSelect.value = state.preset;
+}
+
+function applyPreset(key) {
+  state.preset = normalizePreset(key);
+  const preset = getPresetState(state.preset);
+  state.params = { ...state.params, ...preset.params };
+  state.bypassed = { ...DEFAULTS.bypassed, ...preset.bypassed };
+  saveState();
+  renderPresetSelect();
+  renderKnobs();
+  sendParams();
+  sendEnabled();
+  renderRuntimeStats();
+}
+
+function resetCurrentPreset() {
+  state.preset = normalizePreset(state.preset);
+  const preset = PRESETS[state.preset];
+  state.params = { ...state.params, ...preset.params };
+  state.bypassed = { ...DEFAULTS.bypassed, ...preset.bypassed };
+  if (state.presetOverrides) delete state.presetOverrides[state.preset];
+}
+
+function getPresetState(key) {
+  const presetKey = normalizePreset(key);
+  const preset = PRESETS[presetKey];
+  const override = state.presetOverrides?.[presetKey];
+  return {
+    params: { ...preset.params, ...sanitizePresetParams(override?.params) },
+    bypassed: { ...DEFAULTS.bypassed, ...preset.bypassed, ...sanitizePresetBypassed(override?.bypassed) }
+  };
+}
+
+function saveCurrentPreset() {
+  state.preset = normalizePreset(state.preset);
+  state.presetOverrides = {
+    ...state.presetOverrides,
+    [state.preset]: {
+      params: sanitizePresetParams(state.params),
+      bypassed: sanitizePresetBypassed(state.bypassed, DEFAULTS.bypassed)
+    }
+  };
+}
+
+function sanitizePresetOverrides(source) {
+  const result = {};
+  if (!source || typeof source !== 'object') return result;
+  for (const key of Object.keys(source)) {
+    const presetKey = normalizePreset(key);
+    result[presetKey] = {
+      params: sanitizePresetParams(source[key]?.params),
+      bypassed: sanitizePresetBypassed(source[key]?.bypassed)
+    };
+  }
+  return result;
+}
+
+function sanitizePresetParams(source) {
+  const result = {};
+  if (!source || typeof source !== 'object') return result;
+  for (const knob of KNOBS) {
+    const value = Number(source[knob.key]);
+    if (Number.isFinite(value)) result[knob.key] = clamp(value, 0, 1);
+  }
+  return result;
+}
+
+function sanitizePresetBypassed(source, fallback = {}) {
+  const result = { ...fallback };
+  if (!source || typeof source !== 'object') return result;
+  for (const knob of KNOBS) {
+    if (typeof source[knob.key] === 'boolean') result[knob.key] = source[knob.key];
+  }
+  return result;
+}
+
+function normalizePreset(key) {
+  if (key === 'vrchat') return 'preset1';
+  return PRESETS[key] ? key : DEFAULTS.preset;
 }
 
 function qualitySampleRate(q) {
