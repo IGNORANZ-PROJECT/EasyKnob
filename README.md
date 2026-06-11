@@ -61,52 +61,6 @@ EasyKnob は Web Audio API と AudioWorklet を使って、マイク入力をブ
 4. Discord、VRChat などの入力デバイスを `BlackHole` にします。
 5. EasyKnob を `ON` にして、ノブを調整します。
 
-## ローカル開発
-
-このプロジェクトは静的サイトです。ビルド手順は不要です。
-
-```bash
-cd public
-python3 -m http.server 8080
-```
-
-ブラウザで開きます。
-
-```text
-http://localhost:8080
-```
-
-Firebase Hosting のエミュレータで確認する場合:
-
-```bash
-firebase emulators:start --only hosting
-```
-
-## Firebase Hosting へのデプロイ
-
-`firebase.json` は `public` ディレクトリを公開対象にしています。
-
-```bash
-firebase deploy --only hosting --project easyknob
-```
-
-## ファイル構成
-
-```text
-public/
-  index.html
-  styles.css
-  app.js
-  audio-worklet.js
-  sw.js
-  manifest.webmanifest
-  robots.txt
-  sitemap.xml
-firebase.json
-README.md
-LICENSE
-```
-
 ## セキュリティとプライバシー
 
 - 静的サイトで、アプリ用のバックエンド処理はありません。
