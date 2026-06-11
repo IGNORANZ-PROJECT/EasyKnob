@@ -127,6 +127,28 @@
     </footer>
   </div>
 
+  <dialog id="firstRunNoticeDialog" class="modal notice-modal" aria-labelledby="firstRunNoticeTitle" aria-describedby="firstRunNoticeBody">
+    <form method="dialog" class="modal-card notice-card">
+      <header>
+        <h2 id="firstRunNoticeTitle">大切な注意事項</h2>
+      </header>
+      <div id="firstRunNoticeBody">
+        <p class="muted">EasyKnobを使う前に、プライバシーと音量に関する注意を確認してください。</p>
+        <ul class="notice-list">
+          <li><strong>マイク音声はサーバーへ送信しません。</strong><span>音声処理はブラウザ内で行われます。</span></li>
+          <li><strong>マイク権限が必要です。</strong><span>ONを押すと、ブラウザからマイク使用許可を求められます。</span></li>
+          <li><strong>音量に注意してください。</strong><span>ヘッドホンやスピーカーの音量を低めにしてから起動してください。</span></li>
+          <li><strong>外部アプリ側の設定も影響します。</strong><span>Discord、OBS、VRChat、VB-CABLE、BlackHoleなどの設定によって、音質や遅延が変わります。</span></li>
+          <li><strong>利用は自己責任です。</strong><span>聴覚、機器、配信、通話、OSやブラウザ設定に関する問題について、作者およびIGNORANZ PROJECTは責任を負いません。</span></li>
+        </ul>
+        <p class="notice-note">この注意事項は初回のみ表示されます。詳しい使い方はHELPとREADMEを確認してください。</p>
+      </div>
+      <menu>
+        <button id="noticeAcceptBtn" class="primary" type="button">確認して始める</button>
+      </menu>
+    </form>
+  </dialog>
+
   <dialog id="settingsDialog" class="modal">
     <form method="dialog" class="modal-card">
       <header>

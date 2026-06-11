@@ -92,6 +92,13 @@ h3 { margin: 18px 0 6px; font-size: 16px; }
 .analyzer-setting { margin-top: 14px; }
 menu { display: flex; justify-content: flex-end; gap: 10px; padding: 0; margin: 18px 0 0; }
 .warning-box { border: 1px solid rgba(255,204,102,.42); background: rgba(255,204,102,.07); padding: 2px 14px 12px; border-radius: 6px; margin-top: 16px; }
+.notice-modal { width: min(680px, calc(100vw - 28px)); }
+.notice-card header { margin-bottom: 8px; }
+.notice-list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 10px; }
+.notice-list li { display: grid; gap: 4px; padding: 12px 13px; border: 1px solid var(--line); border-radius: 6px; background: #0c0e12; }
+.notice-list strong { color: var(--text); font-size: 13px; }
+.notice-list span { color: var(--muted); line-height: 1.65; font-size: 13px; }
+.notice-note { margin: 14px 0 0; color: #ffe0a3; font-size: 13px; line-height: 1.65; }
 
 @media (max-width: 860px) {
   .topbar { align-items: flex-start; flex-direction: column; }

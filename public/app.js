@@ -10,6 +10,8 @@ const DEFAULTS = {
   outputDeviceId: ''
 };
 
+const FIRST_RUN_NOTICE_KEY = 'easyknob-first-run-notice-v1';
+
 const KNOBS = [
   { key: 'mic', label: 'MIC', desc: 'マイク入力の大きさ。声が小さい時は上げ、割れる時は下げます。' },
   { key: 'echo', label: 'ECHO', desc: '声が遅れて返ってくる量。カラオケらしい「やまびこ感」を作ります。' },
@@ -94,6 +96,8 @@ const analyzerCanvas = $('analyzerCanvas');
 const analyzerPanel = $('analyzerPanel');
 const analyzerToggle = $('analyzerToggle');
 const analyzerState = $('analyzerState');
+const firstRunNoticeDialog = $('firstRunNoticeDialog');
+const noticeAcceptBtn = $('noticeAcceptBtn');
 
 init();
 
@@ -108,6 +112,7 @@ async function init() {
   renderAnalyzerVisibility();
   renderRuntimeStats();
   await registerServiceWorker();
+  showFirstRunNotice();
   await enumerateDevices();
 }
 
@@ -197,6 +202,12 @@ function bindUi() {
   });
   $('settingsBtn').addEventListener('click', () => $('settingsDialog').showModal());
   $('helpBtn').addEventListener('click', () => $('helpDialog').showModal());
+  if (firstRunNoticeDialog) {
+    firstRunNoticeDialog.addEventListener('cancel', (event) => event.preventDefault());
+  }
+  if (noticeAcceptBtn) {
+    noticeAcceptBtn.addEventListener('click', acceptFirstRunNotice);
+  }
   $('restoreKnobsBtn').addEventListener('click', () => {
     state.enabled = structuredClone(DEFAULTS.enabled);
     state.bypassed = structuredClone(DEFAULTS.bypassed);
@@ -236,6 +247,29 @@ function bindUi() {
   });
   presetSelect.addEventListener('change', () => applyPreset(presetSelect.value));
   window.addEventListener('resize', drawAnalyzerIdle);
+}
+
+function showFirstRunNotice() {
+  if (!firstRunNoticeDialog || typeof firstRunNoticeDialog.showModal !== 'function') return;
+  if (hasAcceptedFirstRunNotice()) return;
+  if (!firstRunNoticeDialog.open) firstRunNoticeDialog.showModal();
+}
+
+function hasAcceptedFirstRunNotice() {
+  try {
+    return localStorage.getItem(FIRST_RUN_NOTICE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function acceptFirstRunNotice() {
+  try {
+    localStorage.setItem(FIRST_RUN_NOTICE_KEY, '1');
+  } catch {
+    /* optional persistence */
+  }
+  if (firstRunNoticeDialog?.open) firstRunNoticeDialog.close('accepted');
 }
 
 function renderKnobs() {
