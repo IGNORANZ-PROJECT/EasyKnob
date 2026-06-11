@@ -1,4 +1,4 @@
-const CACHE = 'easyknob-v28';
+const CACHE = 'easyknob-v29';
 const ASSETS = [
   './', './index.html', './styles.css', './app.js', './audio-worklet.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png'

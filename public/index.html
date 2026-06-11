@@ -61,7 +61,7 @@
         <h1>EasyKnob</h1>
       </div>
       <div class="top-actions">
-        <button id="helpBtn" class="ghost" type="button">HELP</button>
+        <button id="helpBtn" class="ghost intro-btn" type="button">初めての方へ</button>
         <button id="settingsBtn" class="ghost" type="button">設定</button>
       </div>
     </header>
@@ -141,7 +141,7 @@
           <li><strong>外部アプリ側の設定も影響します。</strong><span>Discord、OBS、VRChat、VB-CABLE、BlackHoleなどの設定によって、音質や遅延が変わります。</span></li>
           <li><strong>利用は自己責任です。</strong><span>聴覚、機器、配信、通話、OSやブラウザ設定に関する問題について、作者およびIGNORANZ PROJECTは責任を負いません。</span></li>
         </ul>
-        <p class="notice-note">この注意事項は初回のみ表示されます。詳しい使い方はHELPとREADMEを確認してください。</p>
+        <p class="notice-note">この注意事項は初回のみ表示されます。詳しい使い方は「初めての方へ」とREADMEを確認してください。</p>
       </div>
       <menu>
         <button id="noticeAcceptBtn" class="primary" type="button">確認して始める</button>
@@ -181,19 +181,19 @@
       <section class="reverb-detail-controls" aria-label="REVERB EQ controls">
         <label class="detail-knob">
           <span>FREQ</span>
-          <span class="detail-dial" aria-hidden="true"><i></i></span>
+          <span class="detail-dial" role="slider" tabindex="0" aria-label="REVERB FREQ" aria-valuemin="160" aria-valuemax="12000"><i></i></span>
           <input id="reverbFreqInput" type="range" min="0" max="100" step="1" />
           <em class="detail-value">2.20 kHz</em>
         </label>
         <label class="detail-knob">
           <span>GAIN</span>
-          <span class="detail-dial" aria-hidden="true"><i></i></span>
+          <span class="detail-dial" role="slider" tabindex="0" aria-label="REVERB GAIN" aria-valuemin="-9" aria-valuemax="9"><i></i></span>
           <input id="reverbGainInput" type="range" min="-9" max="9" step="0.1" />
           <em class="detail-value">+3.0 dB</em>
         </label>
         <label class="detail-knob">
           <span>Q</span>
-          <span class="detail-dial" aria-hidden="true"><i></i></span>
+          <span class="detail-dial" role="slider" tabindex="0" aria-label="REVERB Q" aria-valuemin="0.25" aria-valuemax="8"><i></i></span>
           <input id="reverbQInput" type="range" min="0.25" max="8" step="0.01" />
           <em class="detail-value">0.85</em>
         </label>
@@ -208,13 +208,30 @@
   <dialog id="helpDialog" class="modal">
     <form method="dialog" class="modal-card help-card">
       <header>
-        <h2>HELP</h2>
+        <h2>初めての方へ</h2>
         <button class="icon-btn" value="close" aria-label="閉じる">×</button>
       </header>
 
       <section>
-        <h3>まず必要なもの</h3>
-        <p>EasyKnob本体はブラウザで動きます。ただしDiscordやVRChatに渡すには、仮想オーディオが必要です。</p>
+        <h3>EasyKnobでできること</h3>
+        <p>EasyKnobは、マイクの声にECHOやREVERBなどをかけて、Discord、VRChat、OBS、通話アプリなどへ渡すためのブラウザアプリです。音声処理はブラウザ内で行い、マイク音声をサーバーへ送信しません。</p>
+        <p>まずはInputでマイク、Outputで出力先を選び、ONを押します。ブラウザのマイク許可が出たら許可してください。</p>
+      </section>
+
+      <section>
+        <h3>基本の使い方</h3>
+        <ol>
+          <li><strong>Input</strong> で使うマイクを選びます。迷ったらDefaultのままで構いません。</li>
+          <li><strong>Output</strong> で音を出す先を選びます。DiscordやVRChatに渡す場合はVB-CABLEやBlackHoleを選びます。</li>
+          <li><strong>Preset</strong> で用途に近い音を選びます。歌ならSing、会話ならTalkが目安です。</li>
+          <li><strong>ON</strong> を押して起動します。状態がLIVEになれば動作中です。</li>
+          <li>ノブを回して音を調整します。ON/OFF表示を押すと、そのノブだけ一時的に無効化できます。</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>外部アプリへ渡す時に必要なもの</h3>
+        <p>EasyKnob本体はブラウザだけで動きます。ただしDiscordやVRChatに加工後の声を渡すには、仮想オーディオデバイスが必要です。</p>
         <ul>
           <li>Windows: VB-CABLE</li>
           <li>Mac: BlackHole</li>
@@ -228,6 +245,7 @@
           <li>VB-CABLEをインストールします。</li>
           <li>EasyKnobのOutputを <strong>CABLE Input</strong> にします。</li>
           <li>Discordなどの入力を <strong>CABLE Output</strong> にします。</li>
+          <li>Discord側のマイクテストやノイズ抑制をOFFにして、遅延や音質を確認します。</li>
         </ol>
       </section>
 
@@ -237,7 +255,24 @@
           <li>BlackHoleをインストールします。</li>
           <li>EasyKnobのOutputを <strong>BlackHole</strong> にします。</li>
           <li>Discordなどの入力を <strong>BlackHole</strong> にします。</li>
+          <li>必要に応じてAudio MIDI設定でBlackHoleの入出力を確認します。</li>
         </ol>
+      </section>
+
+      <section>
+        <h3>ノブの意味</h3>
+        <ul>
+          <li><strong>MIC</strong>: マイク入力の大きさです。0にするとEasyKnobから出る声も0になります。</li>
+          <li><strong>ECHO</strong>: 後ろで小さく返ってくる遅れ音です。</li>
+          <li><strong>REVERB</strong>: 声の後ろに響きを足します。REVERBカードの詳細ボタンからFREQ、GAIN、Qを調整できます。</li>
+          <li><strong>ROOM</strong>: 空間の広さや左右の広がりです。</li>
+          <li><strong>WET</strong>: エフェクト音の混ざり具合です。下げるほど原音に近くなります。</li>
+          <li><strong>TONE</strong>: 声の明るさです。</li>
+          <li><strong>AIR</strong>: 高域の抜けや空気感です。</li>
+          <li><strong>STABLE</strong>: 音量差や刺さる部分を抑えて声を安定させます。</li>
+          <li><strong>DOUBLE</strong>: 声を少し重ねて厚みを足します。</li>
+        </ul>
+        <p>さらに詳しい説明は、設定画面の各Knob(ノブ)の項目にも記載しています。</p>
       </section>
 
       <section>
@@ -251,6 +286,17 @@
       <section>
         <h3>ハウリング対策</h3>
         <p>スピーカーから出した音をマイクが拾うとハウリングします。基本はヘッドホンか仮想オーディオ出力を使い、スピーカー監視は避けてください。HOWLが出る時は、MIC、WET、ECHO、REVERB、DOUBLEを下げ、Outputをスピーカー以外にしてください。</p>
+      </section>
+
+      <section>
+        <h3>音が出ない時</h3>
+        <ul>
+          <li>ブラウザのマイク許可がブロックされていないか確認してください。</li>
+          <li>Outputと、DiscordやVRChat側の入力デバイスの組み合わせを確認してください。</li>
+          <li>Windowsの場合、Discord側はCABLE Output、EasyKnob側はCABLE Inputです。</li>
+          <li>Macの場合、EasyKnob側も外部アプリ側もBlackHoleを選ぶ構成が基本です。</li>
+          <li>別アプリのマイクテストやモニタリングを同時に使うと、遅延や二重音の原因になります。</li>
+        </ul>
       </section>
 
       <section class="warning-box">

@@ -413,6 +413,7 @@ function bindReverbDetailUi() {
   reverbFreqInput.addEventListener('input', () => updateReverbDetailFromUi());
   reverbGainInput.addEventListener('input', () => updateReverbDetailFromUi());
   reverbQInput.addEventListener('input', () => updateReverbDetailFromUi());
+  [reverbFreqInput, reverbGainInput, reverbQInput].forEach(bindDetailDial);
   window.addEventListener('resize', () => {
     if (reverbDetailDialog.open) drawReverbEq();
   });
@@ -435,6 +436,85 @@ function updateReverbDetailFromUi() {
   renderReverbDetail();
 }
 
+function bindDetailDial(input) {
+  const root = input.closest('.detail-knob');
+  const dial = root?.querySelector('.detail-dial');
+  if (!dial) return;
+
+  const updateFromPointer = (event) => {
+    const rect = dial.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = event.clientX - cx;
+    const dy = event.clientY - cy;
+    if (Math.hypot(dx, dy) < rect.width * 0.16) return;
+    let deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+    if (deg > 180) deg -= 360;
+    setDetailInputFromNormalized(input, (clamp(deg, -135, 135) + 135) / 270);
+  };
+
+  dial.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    dial.focus();
+    dial.setPointerCapture(event.pointerId);
+    updateFromPointer(event);
+  });
+  dial.addEventListener('pointermove', (event) => {
+    if (dial.hasPointerCapture(event.pointerId)) updateFromPointer(event);
+  });
+  const releasePointer = (event) => {
+    if (dial.hasPointerCapture(event.pointerId)) dial.releasePointerCapture(event.pointerId);
+  };
+  dial.addEventListener('pointerup', releasePointer);
+  dial.addEventListener('pointercancel', releasePointer);
+  dial.addEventListener('keydown', (event) => {
+    const keySteps = { ArrowUp: 0.02, ArrowRight: 0.02, ArrowDown: -0.02, ArrowLeft: -0.02, PageUp: 0.1, PageDown: -0.1 };
+    if (event.key === 'Home') {
+      event.preventDefault();
+      setDetailInputFromNormalized(input, 0);
+      return;
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      setDetailInputFromNormalized(input, 1);
+      return;
+    }
+    if (keySteps[event.key]) {
+      event.preventDefault();
+      setDetailInputFromNormalized(input, detailInputToNormalized(input) + keySteps[event.key]);
+    }
+  });
+}
+
+function setDetailInputFromNormalized(input, normalized) {
+  const value = clamp(normalized, 0, 1);
+  if (input === reverbFreqInput) {
+    input.value = Math.round(value * 100);
+  } else {
+    const min = Number(input.min);
+    const max = Number(input.max);
+    const step = Number(input.step) || 1;
+    const decimals = stepDecimals(input.step);
+    const raw = min + value * (max - min);
+    const stepped = min + Math.round((raw - min) / step) * step;
+    input.value = clamp(stepped, min, max).toFixed(decimals);
+  }
+  updateReverbDetailFromUi();
+}
+
+function detailInputToNormalized(input) {
+  if (input === reverbFreqInput) return clamp(Number(input.value) / 100, 0, 1);
+  const min = Number(input.min);
+  const max = Number(input.max);
+  return clamp((Number(input.value) - min) / (max - min), 0, 1);
+}
+
+function stepDecimals(step) {
+  const text = `${step || ''}`;
+  const dot = text.indexOf('.');
+  return dot >= 0 ? text.length - dot - 1 : 0;
+}
+
 function renderReverbDetail() {
   if (!reverbFreqInput || !reverbGainInput || !reverbQInput) return;
   const detail = sanitizeReverbDetail(state.reverbDetail);
@@ -452,6 +532,11 @@ function applyDetailKnobUi(input, angle, label) {
   const root = input.closest('.detail-knob');
   if (!root) return;
   root.style.setProperty('--angle', `${angle}deg`);
+  const dial = root.querySelector('.detail-dial');
+  if (dial) {
+    dial.setAttribute('aria-valuenow', input === reverbFreqInput ? `${Math.round(freqFromNormalized(Number(input.value) / 100))}` : `${Number(input.value)}`);
+    dial.setAttribute('aria-valuetext', label);
+  }
   const value = root.querySelector('.detail-value');
   if (value) value.textContent = label;
 }
@@ -478,8 +563,12 @@ function paintReverbEq(ctx, width, height) {
   const maxFreq = 16000;
   const minDb = -12;
   const maxDb = 12;
-  const freqToX = (freq) => Math.log(freq / minFreq) / Math.log(maxFreq / minFreq) * width;
-  const dbToY = (db) => height - ((db - minDb) / (maxDb - minDb)) * height;
+  const pad = { left: 44, right: 42, top: 18, bottom: 34 };
+  const plotWidth = width - pad.left - pad.right;
+  const plotHeight = height - pad.top - pad.bottom;
+  const freqToX = (freq) => pad.left + Math.log(freq / minFreq) / Math.log(maxFreq / minFreq) * plotWidth;
+  const dbToY = (db) => pad.top + (1 - ((db - minDb) / (maxDb - minDb))) * plotHeight;
+  const hzTicks = [100, 200, 500, 1000, 2000, 5000, 10000];
 
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = '#111217';
@@ -489,37 +578,37 @@ function paintReverbEq(ctx, width, height) {
   for (let db = minDb; db <= maxDb; db += 3) {
     const y = dbToY(db);
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(width - pad.right, y);
     ctx.stroke();
   }
-  for (const freq of [100, 200, 500, 1000, 2000, 5000, 10000]) {
+  for (const freq of hzTicks) {
     const x = freqToX(freq);
     ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
+    ctx.moveTo(x, pad.top);
+    ctx.lineTo(x, height - pad.bottom);
     ctx.stroke();
   }
 
   const centerY = dbToY(0);
   ctx.strokeStyle = 'rgba(255,204,102,.42)';
   ctx.beginPath();
-  ctx.moveTo(0, centerY);
-  ctx.lineTo(width, centerY);
+  ctx.moveTo(pad.left, centerY);
+  ctx.lineTo(width - pad.right, centerY);
   ctx.stroke();
 
   const points = [];
   for (let i = 0; i <= 180; i++) {
-    const x = (i / 180) * width;
+    const x = pad.left + (i / 180) * plotWidth;
     const freq = minFreq * Math.pow(maxFreq / minFreq, i / 180);
     const db = reverbEqMagnitudeDb(freq, detail);
     points.push({ x, y: dbToY(db), db });
   }
 
   ctx.beginPath();
-  ctx.moveTo(0, centerY);
+  ctx.moveTo(pad.left, centerY);
   for (const point of points) ctx.lineTo(point.x, point.y);
-  ctx.lineTo(width, centerY);
+  ctx.lineTo(width - pad.right, centerY);
   ctx.closePath();
   const fill = ctx.createLinearGradient(0, 0, 0, height);
   fill.addColorStop(0, 'rgba(84,240,194,.34)');
@@ -545,6 +634,22 @@ function paintReverbEq(ctx, width, height) {
   ctx.arc(pointX, pointY, 7, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+
+  ctx.fillStyle = 'rgba(244,247,251,.68)';
+  ctx.font = '11px Inter, ui-sans-serif, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for (const freq of hzTicks) {
+    ctx.fillText(formatEqTick(freq), freqToX(freq), height - pad.bottom + 10);
+  }
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(142,152,167,.88)';
+  ctx.fillText('Hz', pad.left, height - 17);
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (const db of [-12, -6, 0, 6, 12]) {
+    ctx.fillText(`${db > 0 ? '+' : ''}${db}`, width - 10, dbToY(db));
+  }
 }
 
 function reverbEqMagnitudeDb(freq, detail) {
@@ -1232,6 +1337,11 @@ function detailAngle(value) {
 function formatFreq(freq) {
   if (freq >= 1000) return `${(freq / 1000).toFixed(freq >= 10000 ? 1 : 2)} kHz`;
   return `${Math.round(freq)} Hz`;
+}
+
+function formatEqTick(freq) {
+  if (freq >= 1000) return `${freq / 1000}k`;
+  return `${freq}`;
 }
 
 function normalizePreset(key) {
