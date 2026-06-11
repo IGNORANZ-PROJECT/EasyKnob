@@ -72,9 +72,10 @@ let starting = false;
 let analyzerFrame = 0;
 let frequencyData = null;
 let timeData = null;
-let latestStats = { load: 0, peak: 0, bufferMs: 0, clip: 0 };
+let latestStats = { load: 0, peak: 0, bufferMs: 0, clip: 0, guard: 1 };
 let statsReceived = false;
 let clipUntil = 0;
+let warningLabel = 'CLIP';
 let supportMessage = '';
 let runtimeMessage = '';
 let availableMicDeviceIds = new Set();
@@ -471,8 +472,9 @@ async function startAudio() {
   startBtn.textContent = '起動中';
   startBtn.classList.remove('active');
   statsReceived = false;
-  latestStats = { load: 0, peak: 0, bufferMs: 0, clip: 0 };
+  latestStats = { load: 0, peak: 0, bufferMs: 0, clip: 0, guard: 1 };
   clipUntil = 0;
+  warningLabel = 'CLIP';
   setRunState('starting', 'マイク許可待ち');
   clearRuntimeError();
   renderRuntimeStats();
@@ -668,11 +670,19 @@ function handleWorkletMessage(data) {
     load: Number.isFinite(data.load) ? data.load : latestStats.load,
     peak: Number.isFinite(data.peak) ? data.peak : latestStats.peak,
     bufferMs: Number.isFinite(data.bufferMs) ? data.bufferMs : latestStats.bufferMs,
-    clip: Number.isFinite(data.clip) ? data.clip : latestStats.clip
+    clip: Number.isFinite(data.clip) ? data.clip : latestStats.clip,
+    guard: Number.isFinite(data.guard) ? data.guard : latestStats.guard
   };
   statsReceived = true;
   const clipping = latestStats.clip >= 0.96 || latestStats.peak >= 0.98;
-  if (clipping) clipUntil = performance.now() + 900;
+  const howling = latestStats.guard < 0.82;
+  if (howling) {
+    warningLabel = 'HOWL';
+    clipUntil = performance.now() + 900;
+  } else if (clipping) {
+    warningLabel = 'CLIP';
+    clipUntil = performance.now() + 900;
+  }
   meterBar.style.width = `${Math.min(100, latestStats.peak * 110)}%`;
   renderRuntimeStats();
 }
@@ -684,9 +694,10 @@ async function stopAudio({ showIdle = true } = {}) {
   startBtn.textContent = 'ON';
   startBtn.classList.remove('active');
   meterBar.style.width = '0%';
-  latestStats = { load: 0, peak: 0, bufferMs: 0, clip: 0 };
+  latestStats = { load: 0, peak: 0, bufferMs: 0, clip: 0, guard: 1 };
   statsReceived = false;
   clipUntil = 0;
+  warningLabel = 'CLIP';
   stopAnalyzer();
   if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
   try { if (sourceNode) sourceNode.disconnect(); } catch {}
@@ -926,6 +937,7 @@ function renderRuntimeStats() {
 
 function renderClipWarning() {
   const visible = running && performance.now() < clipUntil;
+  clipWarning.textContent = warningLabel;
   clipWarning.classList.toggle('hidden', !visible);
   meterBar.classList.toggle('clipping', visible);
 }
