@@ -1,7 +1,7 @@
 const DEFAULTS = {
-  params: { mic: 0.5, echo: 0.25, reverb: 0.2, tone: 0.5, stable: 0.3, double: 0, quality: 'maximum' },
-  enabled: { mic: true, echo: true, reverb: true, tone: true, stable: true, double: true },
-  bypassed: { mic: false, echo: false, reverb: false, tone: false, stable: false, double: false },
+  params: { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0, quality: 'maximum' },
+  enabled: { mic: true, echo: true, reverb: true, room: true, wet: true, tone: true, air: true, stable: true, double: true },
+  bypassed: { mic: false, echo: false, reverb: false, room: false, wet: false, tone: false, air: false, stable: false, double: false },
   preset: 'default',
   presetOverrides: {},
   analyzerEnabled: false,
@@ -14,9 +14,12 @@ const FIRST_RUN_NOTICE_KEY = 'easyknob-first-run-notice-v1';
 
 const KNOBS = [
   { key: 'mic', label: 'MIC', desc: 'マイク入力の大きさ。声が小さい時は上げ、割れる時は下げます。' },
-  { key: 'echo', label: 'ECHO', desc: '声が遅れて返ってくる量。カラオケらしい「やまびこ感」を作ります。' },
-  { key: 'reverb', label: 'REVERB', desc: '空間の響き。部屋やホールで歌っているような広がりを加えます。' },
+  { key: 'echo', label: 'ECHO', desc: '100Hz以下を抑えた遅れ音の返り。声の邪魔になる低域を残しにくくします。' },
+  { key: 'reverb', label: 'REVERB', desc: '残響の量。初期反射と拡散テールで、声の後ろに自然な響きを足します。' },
+  { key: 'room', label: 'ROOM', desc: '空間の広さ。中央の声を残し、左右に少し広げた輪郭をぼかします。' },
+  { key: 'wet', label: 'WET', desc: 'ECHO、REVERB、DOUBLEの混ざり具合。下げるほど原音に近くなります。' },
   { key: 'tone', label: 'TONE', desc: '声の明るさ。左で柔らかく、右でクリアにします。' },
+  { key: 'air', label: 'AIR', desc: '高域の抜け。声の輪郭と空気感を少し足します。' },
   { key: 'stable', label: 'STABLE', desc: '声の音量差を整え、床ノイズを控えめに抑えます。小さい声を聞きやすくし、大きすぎる声を抑えます。' },
   { key: 'double', label: 'DOUBLE', desc: '声を少し重ねて厚みを出します。歌声をリッチにしたい時に使います。' }
 ];
@@ -24,32 +27,32 @@ const KNOBS = [
 const PRESETS = {
   default: {
     label: 'Default',
-    params: { mic: 0.5, echo: 0.25, reverb: 0.2, tone: 0.5, stable: 0.3, double: 0 },
+    params: { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0 },
     bypassed: { ...DEFAULTS.bypassed }
   },
   singing: {
     label: 'Sing',
-    params: { mic: 0.52, echo: 0.34, reverb: 0.32, tone: 0.58, stable: 0.42, double: 0.12 },
+    params: { mic: 0.52, echo: 0.32, reverb: 0.38, room: 0.7, wet: 0.76, tone: 0.58, air: 0.28, stable: 0.42, double: 0.12 },
     bypassed: { ...DEFAULTS.bypassed }
   },
   talk: {
     label: 'Talk',
-    params: { mic: 0.5, echo: 0, reverb: 0, tone: 0.55, stable: 0.5, double: 0 },
+    params: { mic: 0.5, echo: 0, reverb: 0, room: 0.44, wet: 0.45, tone: 0.55, air: 0.12, stable: 0.5, double: 0 },
     bypassed: { mic: false, echo: true, reverb: true, tone: false, stable: false, double: true }
   },
   preset1: {
     label: 'Preset 1',
-    params: { mic: 0.48, echo: 0.14, reverb: 0.12, tone: 0.54, stable: 0.44, double: 0.08 },
+    params: { mic: 0.48, echo: 0.14, reverb: 0.18, room: 0.52, wet: 0.62, tone: 0.54, air: 0.18, stable: 0.44, double: 0.08 },
     bypassed: { ...DEFAULTS.bypassed }
   },
   preset2: {
     label: 'Preset 2',
-    params: { mic: 0.46, echo: 0.06, reverb: 0.08, tone: 0.62, stable: 0.58, double: 0 },
+    params: { mic: 0.46, echo: 0.06, reverb: 0.08, room: 0.38, wet: 0.52, tone: 0.62, air: 0.24, stable: 0.58, double: 0 },
     bypassed: { mic: false, echo: false, reverb: false, tone: false, stable: false, double: true }
   },
   preset3: {
     label: 'Preset 3',
-    params: { mic: 0.52, echo: 0.42, reverb: 0.38, tone: 0.6, stable: 0.36, double: 0.18 },
+    params: { mic: 0.52, echo: 0.42, reverb: 0.44, room: 0.78, wet: 0.82, tone: 0.6, air: 0.34, stable: 0.36, double: 0.18 },
     bypassed: { ...DEFAULTS.bypassed }
   }
 };
