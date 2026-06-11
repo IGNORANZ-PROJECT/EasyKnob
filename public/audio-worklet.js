@@ -57,17 +57,23 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
   readCircular(buffer, writeIndex, offset) {
     return buffer[(writeIndex - offset + buffer.length) % buffer.length];
   }
+  internalLimit(x, limit = 1.08) {
+    if (!Number.isFinite(x)) return 0;
+    return this.clamp(x, -limit, limit);
+  }
   processComb(line, input, feedback, dampCoeff) {
+    input = this.internalLimit(input, 0.72);
     const delayed = line.buffer[line.index];
     line.damp += (delayed - line.damp) * dampCoeff;
-    line.buffer[line.index] = input + line.damp * feedback;
+    line.buffer[line.index] = this.internalLimit(input + line.damp * feedback, 0.96);
     line.index = (line.index + 1) % line.buffer.length;
-    return line.damp;
+    return this.internalLimit(line.damp, 0.96);
   }
   processAllpass(line, input, feedback) {
+    input = this.internalLimit(input, 0.9);
     const delayed = line.buffer[line.index];
-    const output = delayed - input * feedback;
-    line.buffer[line.index] = input + delayed * feedback;
+    const output = this.internalLimit(delayed - input * feedback, 0.96);
+    line.buffer[line.index] = this.internalLimit(input + delayed * feedback, 0.96);
     line.index = (line.index + 1) % line.buffer.length;
     return output;
   }
@@ -120,10 +126,9 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
 
   qualityReverbCount() {
     const q = this.params.quality;
-    if (q === 'light') return 3;
-    if (q === 'balanced') return 4;
-    if (q === 'high') return 5;
-    return 6;
+    if (q === 'light') return 2;
+    if (q === 'balanced') return 3;
+    return 4;
   }
 
   process(inputs, outputs) {
@@ -166,9 +171,9 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     const delaySamples = Math.floor(this.sampleRate * (0.115 + echo * 0.38));
     const feedback = 0.05 + echo * 0.3;
     const wetEcho = echo * wet * 0.62;
-    const wetRev = reverb * wet * (0.52 + room * 0.2);
+    const wetRev = reverb * wet * (0.38 + room * 0.13);
     const reverbCount = this.qualityReverbCount();
-    const revFeedback = this.clamp(0.58 + room * 0.16 + reverb * 0.14, 0.55, 0.88);
+    const revFeedback = this.clamp(0.52 + room * 0.14 + reverb * 0.1, 0.5, 0.78);
     const revDamp = this.clamp(0.18 + air * 0.44 + (1 - room) * 0.08, 0.12, 0.72);
     const preDelaySamples = Math.floor(this.sampleRate * (0.007 + room * 0.034));
     const earlySize = 0.72 + room * 1.35;
@@ -269,13 +274,13 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
         const er2 = this.readCircular(this.revPreBuffer, this.revPreIndex, Math.floor(this.sampleRate * 0.017 * earlySize));
         const er3 = this.readCircular(this.revPreBuffer, this.revPreIndex, Math.floor(this.sampleRate * 0.026 * earlySize));
         const er4 = this.readCircular(this.revPreBuffer, this.revPreIndex, Math.floor(this.sampleRate * 0.039 * earlySize));
-        const earlyCenter = er1 * 0.34 + er2 * 0.27 + er3 * 0.21 + er4 * 0.16;
-        const earlySideRaw = (er1 - er2 + er3 * 0.7 - er4 * 0.55) * (0.12 + room * 0.22);
+        const earlyCenter = this.internalLimit(er1 * 0.34 + er2 * 0.27 + er3 * 0.21 + er4 * 0.16, 0.72);
+        const earlySideRaw = this.internalLimit((er1 - er2 + er3 * 0.7 - er4 * 0.55) * (0.1 + room * 0.18), 0.42);
         this.revEarlySideBlur += (earlySideRaw - this.revEarlySideBlur) * (0.045 - room * 0.018);
 
         let tailL = 0;
         let tailR = 0;
-        const tailInput = pre + earlyCenter * 0.28;
+        const tailInput = this.internalLimit(pre + earlyCenter * 0.22, 0.68);
         for (let c = 0; c < reverbCount; c++) {
           const signL = c % 2 === 0 ? 1 : -0.86;
           const signR = c % 2 === 0 ? -0.82 : 1;
@@ -295,9 +300,9 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
         const tailSideRaw = (tailL - tailR) * 0.5;
         const blurSpeed = 0.008 + (1 - room) * 0.014;
         this.revSideBlur += (tailSideRaw - this.revSideBlur) * blurSpeed;
-        const blurredSide = this.revSideBlur * 0.82 + tailSideRaw * 0.18;
-        const side = (this.revEarlySideBlur * 0.36 + blurredSide) * (0.12 + room * 0.28);
-        const center = earlyCenter * 0.32 + tailCenter * 0.96;
+        const blurredSide = this.revSideBlur * 0.9 + tailSideRaw * 0.1;
+        const side = this.internalLimit((this.revEarlySideBlur * 0.28 + blurredSide) * (0.1 + room * 0.22), 0.42);
+        const center = this.internalLimit(earlyCenter * 0.24 + tailCenter * 0.78, 0.72);
         l += (center + side) * wetRev;
         r += (center - side) * wetRev;
       } else {
@@ -335,10 +340,10 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
       clip = Math.max(clip, preGuardPeak);
       this.feedbackRisk = Math.max(preGuardPeak, this.feedbackRisk * 0.9985);
       let guardTarget = 1;
-      if (this.feedbackRisk > 1.16 || preGuardPeak > 1.16) guardTarget = 0.44;
-      else if (this.feedbackRisk > 0.98 && preGuardPeak > 0.82) guardTarget = 0.68;
-      else if (this.feedbackRisk > 0.88 && preGuardPeak > 0.74) guardTarget = 0.84;
-      const guardSpeed = guardTarget < this.feedbackGuardGain ? 0.075 : 0.0018;
+      if (this.feedbackRisk > 1.18 || preGuardPeak > 1.18) guardTarget = 0.72;
+      else if (this.feedbackRisk > 1.02 && preGuardPeak > 0.86) guardTarget = 0.86;
+      else if (this.feedbackRisk > 0.9 && preGuardPeak > 0.78) guardTarget = 0.94;
+      const guardSpeed = guardTarget < this.feedbackGuardGain ? 0.004 : 0.0008;
       this.feedbackGuardGain += (guardTarget - this.feedbackGuardGain) * guardSpeed;
       l *= this.feedbackGuardGain;
       r *= this.feedbackGuardGain;
