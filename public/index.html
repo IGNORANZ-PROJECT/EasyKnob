@@ -169,6 +169,42 @@
     </form>
   </dialog>
 
+  <dialog id="reverbDetailDialog" class="modal reverb-detail-modal">
+    <form method="dialog" class="modal-card reverb-detail-card">
+      <header>
+        <h2>REVERB 詳細</h2>
+        <button class="icon-btn" value="close" aria-label="閉じる">×</button>
+      </header>
+      <section class="reverb-eq-stage" aria-label="REVERB EQ">
+        <canvas id="reverbEqCanvas" aria-label="REVERB EQカーブ"></canvas>
+      </section>
+      <section class="reverb-detail-controls" aria-label="REVERB EQ controls">
+        <label class="detail-knob">
+          <span>FREQ</span>
+          <span class="detail-dial" aria-hidden="true"><i></i></span>
+          <input id="reverbFreqInput" type="range" min="0" max="100" step="1" />
+          <em class="detail-value">2.20 kHz</em>
+        </label>
+        <label class="detail-knob">
+          <span>GAIN</span>
+          <span class="detail-dial" aria-hidden="true"><i></i></span>
+          <input id="reverbGainInput" type="range" min="-9" max="9" step="0.1" />
+          <em class="detail-value">+3.0 dB</em>
+        </label>
+        <label class="detail-knob">
+          <span>Q</span>
+          <span class="detail-dial" aria-hidden="true"><i></i></span>
+          <input id="reverbQInput" type="range" min="0.25" max="8" step="0.01" />
+          <em class="detail-value">0.85</em>
+        </label>
+      </section>
+      <p class="muted reverb-detail-note">REVERB成分だけにかかるEQです。原音にはかかりません。</p>
+      <menu>
+        <button class="primary" value="close">閉じる</button>
+      </menu>
+    </form>
+  </dialog>
+
   <dialog id="helpDialog" class="modal">
     <form method="dialog" class="modal-card help-card">
       <header>
@@ -209,6 +245,7 @@
         <p>音質を優先する場合は、Discordや配信ソフト側のノイズ抑制、エコー除去、自動ゲイン調整をOFFにしてください。Windows側の音声拡張、空間オーディオ、メーカー製マイク補正もOFF推奨です。</p>
         <p>遅延が気になる場合は、Windowsの「このデバイスを聴く」、Discordのマイクテスト、OBSの音声モニタリングなど、別経路の監視音をOFFにしてください。</p>
         <p>EasyKnob側では、不要なSTABLE、ECHO、REVERB、ROOM、WET、AIR、DOUBLEをOFFまたは低めにすると原音に近くなります。AUDIO ANALYZERも不要な時はOFF推奨です。</p>
+        <p>各Knob(ノブ)の役割は、設定画面のノブ一覧に記載しています。</p>
       </section>
 
       <section>

@@ -4,6 +4,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.sampleRate = sampleRate;
     this.params = { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0, quality: 'maximum' };
     this.enabled = { mic: true, echo: true, reverb: true, room: true, wet: true, tone: true, air: true, stable: true, double: true };
+    this.reverbDetail = { freq: 2200, gain: 3, q: 0.85 };
     this.delayBuffer = new Float32Array(Math.ceil(this.sampleRate * 1.4));
     this.doubleBuffer = new Float32Array(Math.ceil(this.sampleRate * 0.08));
     this.revPreBuffer = new Float32Array(Math.ceil(this.sampleRate * 0.18));
@@ -21,13 +22,27 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.highR = 0;
     this.noiseFloor = 0.005;
     this.noiseGateGain = 1;
+    this.stableGain = 1;
+    this.stableHighEnv = 0;
+    this.stableLowL = 0;
+    this.stableLowR = 0;
     this.feedbackGuardGain = 1;
     this.feedbackRisk = 0;
     this.howlGuardGain = 1;
     this.howlRisk = 0;
     this.echoLow = 0;
+    this.echoTone = 0;
+    this.echoDuckEnv = 0;
     this.revSideBlur = 0;
     this.revEarlySideBlur = 0;
+    this.revEqL1 = 0;
+    this.revEqL2 = 0;
+    this.revEqR1 = 0;
+    this.revEqR2 = 0;
+    this.revEqInL1 = 0;
+    this.revEqInL2 = 0;
+    this.revEqInR1 = 0;
+    this.revEqInR2 = 0;
     this.airLowL = 0;
     this.airLowR = 0;
     this.lfo = 0;
@@ -36,6 +51,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.micMuted = false;
     this.port.onmessage = (event) => {
       if (event.data.type === 'params') this.params = { ...this.params, ...event.data.params };
+      if (event.data.type === 'reverbDetail') this.reverbDetail = { ...this.reverbDetail, ...event.data.reverbDetail };
       if (event.data.type === 'enabled') this.enabled = { ...this.enabled, ...event.data.enabled };
       if (event.data.type === 'visible') this.enabled = { ...this.enabled, ...event.data.visible };
     };
@@ -105,15 +121,61 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.highR = 0;
     this.noiseFloor = 0.005;
     this.noiseGateGain = 1;
+    this.stableGain = 1;
+    this.stableHighEnv = 0;
+    this.stableLowL = 0;
+    this.stableLowR = 0;
     this.feedbackGuardGain = 1;
     this.feedbackRisk = 0;
     this.howlGuardGain = 1;
     this.howlRisk = 0;
     this.echoLow = 0;
+    this.echoTone = 0;
+    this.echoDuckEnv = 0;
     this.revSideBlur = 0;
     this.revEarlySideBlur = 0;
+    this.revEqL1 = 0;
+    this.revEqL2 = 0;
+    this.revEqR1 = 0;
+    this.revEqR2 = 0;
+    this.revEqInL1 = 0;
+    this.revEqInL2 = 0;
+    this.revEqInR1 = 0;
+    this.revEqInR2 = 0;
     this.airLowL = 0;
     this.airLowR = 0;
+  }
+  peakingCoefficients(freq, gainDb, q) {
+    const f = this.clamp(Number(freq) || 2200, 160, Math.min(12000, this.sampleRate * 0.45));
+    const gain = this.clamp(Number(gainDb) || 0, -9, 9);
+    const quality = this.clamp(Number(q) || 0.85, 0.25, 8);
+    const w0 = 2 * Math.PI * f / this.sampleRate;
+    const cos = Math.cos(w0);
+    const alpha = Math.sin(w0) / (2 * quality);
+    const a = Math.pow(10, gain / 40);
+    const b0 = 1 + alpha * a;
+    const b1 = -2 * cos;
+    const b2 = 1 - alpha * a;
+    const a0 = 1 + alpha / a;
+    const a1 = -2 * cos;
+    const a2 = 1 - alpha / a;
+    return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
+  }
+  processReverbEq(x, c, right = false) {
+    if (right) {
+      const y = c.b0 * x + c.b1 * this.revEqInR1 + c.b2 * this.revEqInR2 - c.a1 * this.revEqR1 - c.a2 * this.revEqR2;
+      this.revEqInR2 = this.revEqInR1;
+      this.revEqInR1 = x;
+      this.revEqR2 = this.revEqR1;
+      this.revEqR1 = this.internalLimit(y, 0.96);
+      return this.revEqR1;
+    }
+    const y = c.b0 * x + c.b1 * this.revEqInL1 + c.b2 * this.revEqInL2 - c.a1 * this.revEqL1 - c.a2 * this.revEqL2;
+    this.revEqInL2 = this.revEqInL1;
+    this.revEqInL1 = x;
+    this.revEqL2 = this.revEqL1;
+    this.revEqL1 = this.internalLimit(y, 0.96);
+    return this.revEqL1;
   }
   publishStats(startedAt, frameLength, peak, clip = 0, guard = 1) {
     const endedAt = this.now();
@@ -172,12 +234,13 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
 
     this.micMuted = false;
     const micGain = this.enabled.mic ? mic * 2 : 1;
-    const delaySamples = Math.floor(this.sampleRate * (0.115 + echo * 0.38));
-    const echoFeedback = 0.05 + echo * 0.3;
-    const wetEcho = echo * wet * 0.62;
+    const delaySamples = Math.floor(this.sampleRate * (0.18 + echo * 0.42));
+    const echoFeedback = 0.035 + echo * 0.2;
+    const wetEcho = echo * wet * (0.16 + echo * 0.22);
     const wetRev = reverb * wet * (0.38 + room * 0.13);
     const reverbCount = this.qualityReverbCount();
     const revFeedback = this.clamp(0.52 + room * 0.14 + reverb * 0.1, 0.5, 0.78);
+    const revEq = this.peakingCoefficients(this.reverbDetail.freq, this.reverbDetail.gain, this.reverbDetail.q);
     const revDamp = this.clamp(0.18 + air * 0.44 + (1 - room) * 0.08, 0.12, 0.72);
     const preDelaySamples = Math.floor(this.sampleRate * (0.007 + room * 0.034));
     const earlySize = 0.72 + room * 1.35;
@@ -186,6 +249,16 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     const toneCutoff = 0.065 + Math.abs(toneTilt) * 0.055;
     const airCoeff = 1 - Math.exp(-2 * Math.PI * (5200 + air * 2600) / this.sampleRate);
     const compAmount = stable;
+    const stableAttack = 1 - Math.exp(-1 / (this.sampleRate * (0.0018 + compAmount * 0.0008)));
+    const stableRelease = 1 - Math.exp(-1 / (this.sampleRate * (0.042 + (1 - compAmount) * 0.035)));
+    const stableGainAttack = 1 - Math.exp(-1 / (this.sampleRate * (0.0007 + compAmount * 0.0008)));
+    const stableGainRelease = 1 - Math.exp(-1 / (this.sampleRate * (0.028 + compAmount * 0.028)));
+    const stableToneCoeff = 1 - Math.exp(-2 * Math.PI * (1250 + compAmount * 700) / this.sampleRate);
+    const stableHighAttack = 1 - Math.exp(-1 / (this.sampleRate * 0.0012));
+    const stableHighRelease = 1 - Math.exp(-1 / (this.sampleRate * 0.055));
+    const echoDuckAttack = 1 - Math.exp(-1 / (this.sampleRate * 0.006));
+    const echoDuckRelease = 1 - Math.exp(-1 / (this.sampleRate * 0.18));
+    const echoToneCoeff = 0.16 + echo * 0.14;
     const doubleBase = Math.floor(this.sampleRate * (0.014 + dbl * 0.022));
     const toneOn = this.enabled.tone;
     const stableOn = this.enabled.stable && stable > 0.001;
@@ -223,41 +296,78 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
       const preStablePeak = Math.max(Math.abs(l), Math.abs(r));
 
       if (stableOn) {
-        const level = Math.abs((l + r) * 0.5);
-        const floorTarget = this.clamp(level * 0.72, 0.0028, 0.018);
-        const floorSpeed = level < this.noiseFloor * 2.4 ? 0.0007 : 0.00004;
+        const level = Math.max(preStablePeak, Math.abs((l + r) * 0.5) * 1.15);
+        this.env += (level - this.env) * (level > this.env ? stableAttack : stableRelease);
+
+        const floorTarget = this.clamp(level * 0.42, 0.0018, 0.012);
+        const floorSpeed = level < this.noiseFloor * 2.1 ? 0.00022 : 0.000018;
         this.noiseFloor += (floorTarget - this.noiseFloor) * floorSpeed;
-        const noiseFloor = this.clamp(this.noiseFloor + compAmount * 0.004, 0.004, 0.022);
-        const noiseKnee = noiseFloor * (2.4 + compAmount * 1.2);
-        const noiseDepth = 0.16 + compAmount * 0.42;
+        const noiseFloor = this.clamp(this.noiseFloor + compAmount * 0.002, 0.0025, 0.014);
+        const noiseKnee = noiseFloor * (2.1 + compAmount * 0.6);
+        const noiseDepth = 0.025 + compAmount * 0.075;
         let targetGate = 1;
         if (level < noiseKnee) {
           const openness = this.clamp((level - noiseFloor) / Math.max(0.0001, noiseKnee - noiseFloor), 0, 1);
           const smoothOpen = openness * openness * (3 - 2 * openness);
           targetGate = 1 - noiseDepth * (1 - smoothOpen);
         }
-        const gateSpeed = targetGate > this.noiseGateGain ? 0.24 : 0.006 + compAmount * 0.006;
+        const gateSpeed = targetGate > this.noiseGateGain ? 0.08 : 0.0008 + compAmount * 0.0012;
         this.noiseGateGain += (targetGate - this.noiseGateGain) * gateSpeed;
         l *= this.noiseGateGain;
         r *= this.noiseGateGain;
 
-        const stableLevel = level * this.noiseGateGain;
-        this.env = Math.max(stableLevel, this.env * (0.994 - compAmount * 0.012));
-        const threshold = 0.22 - compAmount * 0.12;
-        let gain = 1;
+        this.stableLowL += (l - this.stableLowL) * stableToneCoeff;
+        this.stableLowR += (r - this.stableLowR) * stableToneCoeff;
+        const stableHighL = l - this.stableLowL;
+        const stableHighR = r - this.stableLowR;
+        const highLevel = Math.max(Math.abs(stableHighL), Math.abs(stableHighR));
+        this.stableHighEnv += (highLevel - this.stableHighEnv) * (highLevel > this.stableHighEnv ? stableHighAttack : stableHighRelease);
+        const highThreshold = 0.074 - compAmount * 0.028;
+        let highGain = 1;
+        if (this.stableHighEnv > highThreshold) {
+          const highRatio = 1.8 + compAmount * 4.2;
+          const highDesired = highThreshold + (this.stableHighEnv - highThreshold) / highRatio;
+          highGain = this.clamp(highDesired / Math.max(0.0001, this.stableHighEnv), 0.46, 1);
+        }
+        l = this.stableLowL + stableHighL * highGain;
+        r = this.stableLowR + stableHighR * highGain;
+
+        const threshold = 0.18 - compAmount * 0.09;
+        const ratio = 1.6 + compAmount * 5.4;
+        let compGain = 1;
         if (this.env > threshold) {
           const over = this.env / Math.max(0.001, threshold);
-          gain = 1 / (1 + (over - 1) * (0.35 + compAmount * 1.2));
+          const compressed = threshold * Math.pow(over, 1 / ratio);
+          compGain = this.clamp(compressed / Math.max(0.0001, this.env), 0.22, 1);
         }
-        const makeup = 1 + compAmount * 0.28;
-        l *= gain * makeup;
-        r *= gain * makeup;
+
+        const stablePeak = Math.max(Math.abs(l), Math.abs(r));
+        const peakThreshold = 0.58 - compAmount * 0.22;
+        let peakGain = 1;
+        if (stablePeak > peakThreshold) {
+          const peakRatio = 2.2 + compAmount * 7.8;
+          const peakDesired = peakThreshold + (stablePeak - peakThreshold) / peakRatio;
+          peakGain = this.clamp(peakDesired / Math.max(0.0001, stablePeak), 0.16, 1);
+        }
+        const targetStableGain = this.clamp(Math.min(compGain, peakGain), 0.16, 1);
+        this.stableGain += (targetStableGain - this.stableGain) * (targetStableGain < this.stableGain ? stableGainAttack : stableGainRelease);
+        const makeup = 1 + compAmount * 0.1;
+        const stableGain = Math.min(this.stableGain, peakGain) * makeup;
+        l *= stableGain;
+        r *= stableGain;
       } else {
         this.noiseGateGain += (1 - this.noiseGateGain) * 0.05;
+        this.stableGain += (1 - this.stableGain) * 0.02;
+        this.stableHighEnv *= 0.98;
+        this.stableLowL += (l - this.stableLowL) * 0.02;
+        this.stableLowR += (r - this.stableLowR) * 0.02;
         this.env = Math.max(Math.abs(mono), this.env * 0.98);
       }
 
       const fxMono = (l + r) * 0.5;
+      const echoPresence = Math.abs(fxMono);
+      this.echoDuckEnv += (echoPresence - this.echoDuckEnv) * (echoPresence > this.echoDuckEnv ? echoDuckAttack : echoDuckRelease);
+      const echoDuck = 1 - this.clamp((this.echoDuckEnv - 0.035) / 0.22, 0, 0.58);
       const howlGuard = this.clamp(this.howlGuardGain, 0.32, 1);
       const fxGuard = howlGuard * howlGuard;
       const sendGuard = 0.48 + howlGuard * 0.52;
@@ -269,13 +379,16 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
         this.echoLow += (echoInput - this.echoLow) * echoLowCoeff;
         this.delayBuffer[this.delayIndex] = echoInput - this.echoLow;
         this.delayIndex = (this.delayIndex + 1) % this.delayBuffer.length;
-        l += d * wetEcho * fxGuard;
-        r += d * wetEcho * fxGuard;
+        this.echoTone += (d - this.echoTone) * echoToneCoeff;
+        const echoOut = this.echoTone * 0.74 + d * 0.26;
+        l += echoOut * wetEcho * fxGuard * echoDuck;
+        r += echoOut * wetEcho * fxGuard * echoDuck;
       } else {
         const safeEchoStore = fxMono * sendGuard;
         this.echoLow += (safeEchoStore - this.echoLow) * echoLowCoeff;
         this.delayBuffer[this.delayIndex] = safeEchoStore - this.echoLow;
         this.delayIndex = (this.delayIndex + 1) % this.delayBuffer.length;
+        this.echoTone += (0 - this.echoTone) * 0.04;
       }
 
       this.revPreBuffer[this.revPreIndex] = fxMono * sendGuard;
@@ -315,11 +428,17 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
         const blurredSide = this.revSideBlur * 0.9 + tailSideRaw * 0.1;
         const side = this.internalLimit((this.revEarlySideBlur * 0.28 + blurredSide) * (0.1 + room * 0.22), 0.42);
         const center = this.internalLimit(earlyCenter * 0.24 + tailCenter * 0.78, 0.72);
-        l += (center + side) * wetRev * fxGuard;
-        r += (center - side) * wetRev * fxGuard;
+        const revL = this.processReverbEq(center + side, revEq);
+        const revR = this.processReverbEq(center - side, revEq, true);
+        l += revL * wetRev * fxGuard;
+        r += revR * wetRev * fxGuard;
       } else {
         this.revSideBlur += (0 - this.revSideBlur) * 0.02;
         this.revEarlySideBlur += (0 - this.revEarlySideBlur) * 0.04;
+        this.revEqL1 *= 0.98;
+        this.revEqL2 *= 0.98;
+        this.revEqR1 *= 0.98;
+        this.revEqR2 *= 0.98;
       }
       this.revPreIndex = (this.revPreIndex + 1) % this.revPreBuffer.length;
 

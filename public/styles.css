@@ -59,6 +59,8 @@ button:disabled:hover { border-color: var(--line); transform: none; }
 .knob-state { border: 1px solid rgba(84,240,194,.45); color: var(--accent); background: transparent; border-radius: 999px; padding: 3px 8px; font-size: 10px; font-weight: 800; min-height: 0; line-height: 1.2; }
 .knob-state.off { border-color: rgba(255,255,255,.18); color: var(--muted); }
 .knob-state:hover { border-color: rgba(255,255,255,.38); transform: none; }
+.knob-detail { justify-self: start; border: 1px solid rgba(255,204,102,.36); color: var(--accent-2); background: rgba(255,204,102,.06); border-radius: 6px; padding: 6px 9px; font-size: 10px; font-weight: 900; letter-spacing: .1em; min-height: 0; line-height: 1; }
+.knob-detail:hover { border-color: rgba(255,204,102,.7); transform: none; }
 .knob { justify-self: center; width: 124px; height: 124px; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #ffffff, #d8dde4 31%, #6f7784 63%, #161a21 100%); border: 8px solid #090b0f; box-shadow: inset 0 -12px 22px rgba(0,0,0,.36), 0 13px 26px rgba(0,0,0,.34); position: relative; cursor: grab; touch-action: none; }
 .knob:active { cursor: grabbing; }
 .knob::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; border: 1px solid rgba(84,240,194,.22); }
@@ -99,11 +101,25 @@ menu { display: flex; justify-content: flex-end; gap: 10px; padding: 0; margin: 
 .notice-list strong { color: var(--text); font-size: 13px; }
 .notice-list span { color: var(--muted); line-height: 1.65; font-size: 13px; }
 .notice-note { margin: 14px 0 0; color: #ffe0a3; font-size: 13px; line-height: 1.65; }
+.reverb-detail-modal { width: min(880px, calc(100vw - 28px)); }
+.reverb-detail-card { display: grid; gap: 14px; }
+.reverb-eq-stage { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #111217; }
+#reverbEqCanvas { display: block; width: 100%; height: 300px; }
+.reverb-detail-controls { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 12px; align-items: stretch; }
+.detail-knob { position: relative; display: grid; justify-items: center; gap: 8px; padding: 14px 12px; border: 1px solid var(--line); border-radius: 8px; background: #0c0e12; text-transform: none; letter-spacing: 0; }
+.detail-knob span:first-child { color: var(--muted); font-size: 11px; font-weight: 900; letter-spacing: .12em; }
+.detail-dial { width: 88px; height: 88px; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #f4f6f8, #aeb5bf 42%, #303642 100%); border: 7px solid #07090d; box-shadow: inset 0 -9px 18px rgba(0,0,0,.4), 0 10px 24px rgba(0,0,0,.35); position: relative; }
+.detail-dial i { position: absolute; inset: 0; transform: rotate(var(--angle)); }
+.detail-dial i::before { content: ""; position: absolute; left: 50%; top: 9px; width: 5px; height: 27px; border-radius: 999px; background: #050608; transform: translateX(-50%); }
+.detail-knob input { width: min(130px, 100%); accent-color: var(--accent-2); }
+.detail-value { color: var(--text); font-style: normal; font-size: 13px; font-variant-numeric: tabular-nums; }
+.reverb-detail-note { margin: 0; font-size: 13px; }
 
 @media (max-width: 860px) {
   .topbar { align-items: flex-start; flex-direction: column; }
   .routing-card { grid-template-columns: 1fr; }
   .knob-grid { grid-template-columns: 1fr 1fr; }
+  #reverbEqCanvas { height: 240px; }
 }
 
 @media (max-width: 560px) {
@@ -117,4 +133,6 @@ menu { display: flex; justify-content: flex-end; gap: 10px; padding: 0; margin: 
   .setting-item { grid-template-columns: auto 1fr; }
   .setting-item em { grid-column: 2; }
   .site-footer { align-items: flex-start; flex-direction: column; }
+  .reverb-detail-controls { grid-template-columns: 1fr; }
+  #reverbEqCanvas { height: 220px; }
 }

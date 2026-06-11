@@ -1,7 +1,10 @@
+const REVERB_DETAIL_DEFAULTS = { freq: 2200, gain: 3, q: 0.85 };
+
 const DEFAULTS = {
   params: { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0, quality: 'maximum' },
   enabled: { mic: true, echo: true, reverb: true, room: true, wet: true, tone: true, air: true, stable: true, double: true },
   bypassed: { mic: false, echo: false, reverb: false, room: false, wet: false, tone: false, air: false, stable: false, double: false },
+  reverbDetail: { ...REVERB_DETAIL_DEFAULTS },
   preset: 'default',
   presetOverrides: {},
   analyzerEnabled: false,
@@ -14,13 +17,13 @@ const FIRST_RUN_NOTICE_KEY = 'easyknob-first-run-notice-v1';
 
 const KNOBS = [
   { key: 'mic', label: 'MIC', desc: 'マイク入力の大きさ。声が小さい時は上げ、割れる時は下げます。' },
-  { key: 'echo', label: 'ECHO', desc: '100Hz以下を抑えた遅れ音の返り。声の邪魔になる低域を残しにくくします。' },
+  { key: 'echo', label: 'ECHO', desc: '後ろで小さく返る遅れ音。100Hz以下を抑え、発声中は少し引っ込めます。' },
   { key: 'reverb', label: 'REVERB', desc: '残響の量。初期反射と拡散テールで、声の後ろに自然な響きを足します。' },
   { key: 'room', label: 'ROOM', desc: '空間の広さ。中央の声を残し、左右に少し広げた輪郭をぼかします。' },
   { key: 'wet', label: 'WET', desc: 'ECHO、REVERB、DOUBLEの混ざり具合。下げるほど原音に近くなります。' },
   { key: 'tone', label: 'TONE', desc: '声の明るさ。左で柔らかく、右でクリアにします。' },
   { key: 'air', label: 'AIR', desc: '高域の抜け。声の輪郭と空気感を少し足します。' },
-  { key: 'stable', label: 'STABLE', desc: '声の音量差を整え、床ノイズを控えめに抑えます。小さい声を聞きやすくし、大きすぎる声を抑えます。' },
+  { key: 'stable', label: 'STABLE', desc: '声の上をしっかり抑え、音量差と刺さる帯域を整えます。途切れにくい音量安定化です。' },
   { key: 'double', label: 'DOUBLE', desc: '声を少し重ねて厚みを出します。歌声をリッチにしたい時に使います。' }
 ];
 
@@ -28,31 +31,37 @@ const PRESETS = {
   default: {
     label: 'Default',
     params: { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0 },
+    reverbDetail: { ...REVERB_DETAIL_DEFAULTS },
     bypassed: { ...DEFAULTS.bypassed }
   },
   singing: {
     label: 'Sing',
     params: { mic: 0.52, echo: 0.32, reverb: 0.38, room: 0.7, wet: 0.76, tone: 0.58, air: 0.28, stable: 0.42, double: 0.12 },
+    reverbDetail: { freq: 2600, gain: 3.8, q: 0.75 },
     bypassed: { ...DEFAULTS.bypassed }
   },
   talk: {
     label: 'Talk',
     params: { mic: 0.5, echo: 0, reverb: 0, room: 0.44, wet: 0.45, tone: 0.55, air: 0.12, stable: 0.5, double: 0 },
+    reverbDetail: { freq: 1800, gain: 1.2, q: 0.7 },
     bypassed: { mic: false, echo: true, reverb: true, tone: false, stable: false, double: true }
   },
   preset1: {
     label: 'Preset 1',
     params: { mic: 0.48, echo: 0.14, reverb: 0.18, room: 0.52, wet: 0.62, tone: 0.54, air: 0.18, stable: 0.44, double: 0.08 },
+    reverbDetail: { ...REVERB_DETAIL_DEFAULTS },
     bypassed: { ...DEFAULTS.bypassed }
   },
   preset2: {
     label: 'Preset 2',
     params: { mic: 0.46, echo: 0.06, reverb: 0.08, room: 0.38, wet: 0.52, tone: 0.62, air: 0.24, stable: 0.58, double: 0 },
+    reverbDetail: { freq: 1400, gain: 0.8, q: 0.65 },
     bypassed: { mic: false, echo: false, reverb: false, tone: false, stable: false, double: true }
   },
   preset3: {
     label: 'Preset 3',
     params: { mic: 0.52, echo: 0.42, reverb: 0.44, room: 0.78, wet: 0.82, tone: 0.6, air: 0.34, stable: 0.36, double: 0.18 },
+    reverbDetail: { freq: 3100, gain: 4.2, q: 0.9 },
     bypassed: { ...DEFAULTS.bypassed }
   }
 };
@@ -102,6 +111,11 @@ const analyzerToggle = $('analyzerToggle');
 const analyzerState = $('analyzerState');
 const firstRunNoticeDialog = $('firstRunNoticeDialog');
 const noticeAcceptBtn = $('noticeAcceptBtn');
+const reverbDetailDialog = $('reverbDetailDialog');
+const reverbEqCanvas = $('reverbEqCanvas');
+const reverbFreqInput = $('reverbFreqInput');
+const reverbGainInput = $('reverbGainInput');
+const reverbQInput = $('reverbQInput');
 
 init();
 
@@ -141,6 +155,7 @@ function loadState() {
       params: { ...DEFAULTS.params, ...parsed.params },
       enabled: { ...DEFAULTS.enabled, ...migratedEnabled },
       bypassed: { ...DEFAULTS.bypassed, ...parsed.bypassed },
+      reverbDetail: sanitizeReverbDetail(parsed.reverbDetail),
       preset,
       presetOverrides,
       analyzerEnabled: analyzerPreferenceSet ? (parsed.analyzerEnabled ?? DEFAULTS.analyzerEnabled) : DEFAULTS.analyzerEnabled,
@@ -200,12 +215,14 @@ function bindUi() {
     saveState();
     renderPresetSelect();
     renderKnobs();
+    renderReverbDetail();
     sendParams();
     sendEnabled();
     renderRuntimeStats();
   });
   $('settingsBtn').addEventListener('click', () => $('settingsDialog').showModal());
   $('helpBtn').addEventListener('click', () => $('helpDialog').showModal());
+  bindReverbDetailUi();
   if (firstRunNoticeDialog) {
     firstRunNoticeDialog.addEventListener('cancel', (event) => event.preventDefault());
   }
@@ -289,6 +306,7 @@ function renderKnobs() {
         <div class="knob-name">${knob.label}</div>
         <button class="knob-state${active ? '' : ' off'}" type="button" aria-pressed="${active ? 'true' : 'false'}" aria-label="${knob.label} ${active ? '無効化' : '有効化'}">${active ? 'ON' : 'OFF'}</button>
       </div>
+      ${knob.key === 'reverb' ? '<button class="knob-detail" type="button">詳細</button>' : ''}
       <div class="knob" role="slider" tabindex="${active ? '0' : '-1'}" aria-label="${knob.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(value * 100)}" aria-disabled="${active ? 'false' : 'true'}">
         <span class="knob-pointer" aria-hidden="true"></span>
       </div>
@@ -313,7 +331,9 @@ function bindKnobControl(card, knob) {
   const dial = card.querySelector('.knob');
   const range = card.querySelector('input');
   const stateButton = card.querySelector('.knob-state');
+  const detailButton = card.querySelector('.knob-detail');
   stateButton.addEventListener('click', () => toggleKnobBypass(knob.key));
+  if (detailButton) detailButton.addEventListener('click', openReverbDetail);
   range.addEventListener('input', () => {
     setKnobValue(knob.key, card, Number(range.value) / 100);
   });
@@ -386,6 +406,154 @@ function setKnobValue(key, card, rawValue) {
   saveCurrentPreset();
   saveState();
   sendParams();
+}
+
+function bindReverbDetailUi() {
+  if (!reverbDetailDialog || !reverbFreqInput || !reverbGainInput || !reverbQInput) return;
+  reverbFreqInput.addEventListener('input', () => updateReverbDetailFromUi());
+  reverbGainInput.addEventListener('input', () => updateReverbDetailFromUi());
+  reverbQInput.addEventListener('input', () => updateReverbDetailFromUi());
+  window.addEventListener('resize', () => {
+    if (reverbDetailDialog.open) drawReverbEq();
+  });
+}
+
+function openReverbDetail() {
+  if (typeof reverbDetailDialog?.showModal === 'function') reverbDetailDialog.showModal();
+  renderReverbDetail();
+}
+
+function updateReverbDetailFromUi() {
+  state.reverbDetail = sanitizeReverbDetail({
+    freq: freqFromNormalized(Number(reverbFreqInput.value) / 100),
+    gain: Number(reverbGainInput.value),
+    q: Number(reverbQInput.value)
+  });
+  saveCurrentPreset();
+  saveState();
+  sendReverbDetail();
+  renderReverbDetail();
+}
+
+function renderReverbDetail() {
+  if (!reverbFreqInput || !reverbGainInput || !reverbQInput) return;
+  const detail = sanitizeReverbDetail(state.reverbDetail);
+  state.reverbDetail = detail;
+  reverbFreqInput.value = Math.round(normalizedFromFreq(detail.freq) * 100);
+  reverbGainInput.value = detail.gain.toFixed(1);
+  reverbQInput.value = detail.q.toFixed(2);
+  applyDetailKnobUi(reverbFreqInput, detailAngle(normalizedFromFreq(detail.freq)), formatFreq(detail.freq));
+  applyDetailKnobUi(reverbGainInput, detailAngle((detail.gain + 9) / 18), `${detail.gain >= 0 ? '+' : ''}${detail.gain.toFixed(1)} dB`);
+  applyDetailKnobUi(reverbQInput, detailAngle((detail.q - 0.25) / 7.75), detail.q.toFixed(2));
+  drawReverbEq();
+}
+
+function applyDetailKnobUi(input, angle, label) {
+  const root = input.closest('.detail-knob');
+  if (!root) return;
+  root.style.setProperty('--angle', `${angle}deg`);
+  const value = root.querySelector('.detail-value');
+  if (value) value.textContent = label;
+}
+
+function drawReverbEq() {
+  if (!reverbEqCanvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(320, reverbEqCanvas.clientWidth);
+  const height = Math.max(190, reverbEqCanvas.clientHeight);
+  const targetWidth = Math.floor(width * dpr);
+  const targetHeight = Math.floor(height * dpr);
+  if (reverbEqCanvas.width !== targetWidth || reverbEqCanvas.height !== targetHeight) {
+    reverbEqCanvas.width = targetWidth;
+    reverbEqCanvas.height = targetHeight;
+  }
+  const ctx = reverbEqCanvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  paintReverbEq(ctx, width, height);
+}
+
+function paintReverbEq(ctx, width, height) {
+  const detail = sanitizeReverbDetail(state.reverbDetail);
+  const minFreq = 80;
+  const maxFreq = 16000;
+  const minDb = -12;
+  const maxDb = 12;
+  const freqToX = (freq) => Math.log(freq / minFreq) / Math.log(maxFreq / minFreq) * width;
+  const dbToY = (db) => height - ((db - minDb) / (maxDb - minDb)) * height;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#111217';
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = 'rgba(255,255,255,.07)';
+  ctx.lineWidth = 1;
+  for (let db = minDb; db <= maxDb; db += 3) {
+    const y = dbToY(db);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+  for (const freq of [100, 200, 500, 1000, 2000, 5000, 10000]) {
+    const x = freqToX(freq);
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+
+  const centerY = dbToY(0);
+  ctx.strokeStyle = 'rgba(255,204,102,.42)';
+  ctx.beginPath();
+  ctx.moveTo(0, centerY);
+  ctx.lineTo(width, centerY);
+  ctx.stroke();
+
+  const points = [];
+  for (let i = 0; i <= 180; i++) {
+    const x = (i / 180) * width;
+    const freq = minFreq * Math.pow(maxFreq / minFreq, i / 180);
+    const db = reverbEqMagnitudeDb(freq, detail);
+    points.push({ x, y: dbToY(db), db });
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(0, centerY);
+  for (const point of points) ctx.lineTo(point.x, point.y);
+  ctx.lineTo(width, centerY);
+  ctx.closePath();
+  const fill = ctx.createLinearGradient(0, 0, 0, height);
+  fill.addColorStop(0, 'rgba(84,240,194,.34)');
+  fill.addColorStop(1, 'rgba(84,240,194,.03)');
+  ctx.fillStyle = fill;
+  ctx.fill();
+
+  ctx.strokeStyle = '#ffcc66';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((point, index) => {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  });
+  ctx.stroke();
+
+  const pointX = freqToX(detail.freq);
+  const pointY = dbToY(detail.gain);
+  ctx.fillStyle = '#54f0c2';
+  ctx.strokeStyle = 'rgba(255,255,255,.9)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(pointX, pointY, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+}
+
+function reverbEqMagnitudeDb(freq, detail) {
+  const f = clamp(freq, 80, 16000);
+  const gain = clamp(detail.gain, -9, 9);
+  const q = clamp(detail.q, 0.25, 8);
+  const distance = Math.log2(f / detail.freq) * q;
+  const shape = Math.exp(-0.5 * distance * distance);
+  return gain * shape;
 }
 
 function applyKnobUi(card, value) {
@@ -785,6 +953,12 @@ async function applyOutputDevice({ allowFallback = false } = {}) {
 function sendParams() {
   if (!workletNode) return;
   workletNode.port.postMessage({ type: 'params', params: state.params });
+  sendReverbDetail();
+}
+
+function sendReverbDetail() {
+  if (!workletNode) return;
+  workletNode.port.postMessage({ type: 'reverbDetail', reverbDetail: sanitizeReverbDetail(state.reverbDetail) });
 }
 
 function sendEnabled() {
@@ -952,9 +1126,11 @@ function applyPreset(key) {
   const preset = getPresetState(state.preset);
   state.params = { ...state.params, ...preset.params };
   state.bypassed = { ...DEFAULTS.bypassed, ...preset.bypassed };
+  state.reverbDetail = sanitizeReverbDetail(preset.reverbDetail);
   saveState();
   renderPresetSelect();
   renderKnobs();
+  renderReverbDetail();
   sendParams();
   sendEnabled();
   renderRuntimeStats();
@@ -965,6 +1141,7 @@ function resetCurrentPreset() {
   const preset = PRESETS[state.preset];
   state.params = { ...state.params, ...preset.params };
   state.bypassed = { ...DEFAULTS.bypassed, ...preset.bypassed };
+  state.reverbDetail = sanitizeReverbDetail(preset.reverbDetail);
   if (state.presetOverrides) delete state.presetOverrides[state.preset];
 }
 
@@ -974,7 +1151,8 @@ function getPresetState(key) {
   const override = state.presetOverrides?.[presetKey];
   return {
     params: { ...preset.params, ...sanitizePresetParams(override?.params) },
-    bypassed: { ...DEFAULTS.bypassed, ...preset.bypassed, ...sanitizePresetBypassed(override?.bypassed) }
+    bypassed: { ...DEFAULTS.bypassed, ...preset.bypassed, ...sanitizePresetBypassed(override?.bypassed) },
+    reverbDetail: sanitizeReverbDetail(override?.reverbDetail || preset.reverbDetail)
   };
 }
 
@@ -984,7 +1162,8 @@ function saveCurrentPreset() {
     ...state.presetOverrides,
     [state.preset]: {
       params: sanitizePresetParams(state.params),
-      bypassed: sanitizePresetBypassed(state.bypassed, DEFAULTS.bypassed)
+      bypassed: sanitizePresetBypassed(state.bypassed, DEFAULTS.bypassed),
+      reverbDetail: sanitizeReverbDetail(state.reverbDetail)
     }
   };
 }
@@ -996,7 +1175,8 @@ function sanitizePresetOverrides(source) {
     const presetKey = normalizePreset(key);
     result[presetKey] = {
       params: sanitizePresetParams(source[key]?.params),
-      bypassed: sanitizePresetBypassed(source[key]?.bypassed)
+      bypassed: sanitizePresetBypassed(source[key]?.bypassed),
+      reverbDetail: sanitizeReverbDetail(source[key]?.reverbDetail)
     };
   }
   return result;
@@ -1019,6 +1199,39 @@ function sanitizePresetBypassed(source, fallback = {}) {
     if (typeof source[knob.key] === 'boolean') result[knob.key] = source[knob.key];
   }
   return result;
+}
+
+function sanitizeReverbDetail(source) {
+  const detail = { ...REVERB_DETAIL_DEFAULTS, ...(source || {}) };
+  const freq = Number(detail.freq);
+  const gain = Number(detail.gain);
+  const q = Number(detail.q);
+  return {
+    freq: Number.isFinite(freq) ? clamp(freq, 160, 12000) : REVERB_DETAIL_DEFAULTS.freq,
+    gain: Number.isFinite(gain) ? clamp(gain, -9, 9) : REVERB_DETAIL_DEFAULTS.gain,
+    q: Number.isFinite(q) ? clamp(q, 0.25, 8) : REVERB_DETAIL_DEFAULTS.q
+  };
+}
+
+function freqFromNormalized(value) {
+  const min = Math.log(160);
+  const max = Math.log(12000);
+  return Math.exp(min + clamp(value, 0, 1) * (max - min));
+}
+
+function normalizedFromFreq(freq) {
+  const min = Math.log(160);
+  const max = Math.log(12000);
+  return clamp((Math.log(clamp(freq, 160, 12000)) - min) / (max - min), 0, 1);
+}
+
+function detailAngle(value) {
+  return -135 + clamp(value, 0, 1) * 270;
+}
+
+function formatFreq(freq) {
+  if (freq >= 1000) return `${(freq / 1000).toFixed(freq >= 10000 ? 1 : 2)} kHz`;
+  return `${Math.round(freq)} Hz`;
 }
 
 function normalizePreset(key) {
