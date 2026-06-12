@@ -1,13 +1,18 @@
 const MAX_REVERB_BANDS = 4;
-const REVERB_DETAIL_DEFAULTS = { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2200, gain: 3, q: 0.85 }] };
+const PRESET_DEFAULTS_VERSION = 2;
+const REVERB_DETAIL_DEFAULTS = { selectedBandId: 'band-1', bands: [
+  { id: 'band-1', freq: 2200, gain: 2.5, q: 0.76 },
+  { id: 'band-2', freq: 5000, gain: 1.0, q: 0.9 }
+] };
 
 const DEFAULTS = {
-  params: { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0, quality: 'maximum' },
+  params: { mic: 0.5, echo: 0.4, reverb: 0.2, room: 0.52, wet: 0.72, tone: 0.56, air: 0.2, stable: 0.36, double: 0.04, quality: 'maximum' },
   enabled: { mic: true, echo: true, reverb: true, room: true, wet: true, tone: true, air: true, stable: true, double: true },
   bypassed: { mic: false, echo: false, reverb: false, room: false, wet: false, tone: false, air: false, stable: false, double: false },
   reverbDetail: defaultReverbDetail(),
   preset: 'default',
   presetOverrides: {},
+  presetDefaultsVersion: PRESET_DEFAULTS_VERSION,
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
   micDeviceId: 'default',
@@ -15,28 +20,54 @@ const DEFAULTS = {
 };
 
 const QUICK_TONES = {
-  clearEcho: {
-    label: '大きめエコー',
-    params: { mic: 0.5, echo: 0.5, reverb: 0.22, room: 0.54, wet: 0.78, tone: 0.56, air: 0.2, stable: 0.34, double: 0.04 },
-    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2200, gain: 2.4, q: 0.72 }] },
+  catchphrase: {
+    label: '決め台詞を決めたい',
+    params: { mic: 0.5, echo: 0.44, reverb: 0.18, room: 0.48, wet: 0.74, tone: 0.58, air: 0.22, stable: 0.4, double: 0.05 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [
+      { id: 'band-1', freq: 2200, gain: 2.6, q: 0.74 },
+      { id: 'band-2', freq: 5200, gain: 1.4, q: 0.9 }
+    ] },
     bypassed: { ...DEFAULTS.bypassed }
   },
-  singReady: {
-    label: '歌向け',
-    params: { mic: 0.52, echo: 0.32, reverb: 0.38, room: 0.7, wet: 0.76, tone: 0.58, air: 0.28, stable: 0.42, double: 0.12 },
-    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2600, gain: 3.8, q: 0.75 }] },
+  godVoice: {
+    label: '神っぽく話したい',
+    params: { mic: 0.46, echo: 0.56, reverb: 0.58, room: 0.88, wet: 0.86, tone: 0.42, air: 0.24, stable: 0.36, double: 0.2 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [
+      { id: 'band-1', freq: 720, gain: 2.4, q: 0.62 },
+      { id: 'band-2', freq: 2600, gain: 1.8, q: 0.82 },
+      { id: 'band-3', freq: 7800, gain: -1.2, q: 0.7 }
+    ] },
     bypassed: { ...DEFAULTS.bypassed }
   },
-  talkReady: {
-    label: '会話向け',
-    params: { mic: 0.5, echo: 0, reverb: 0.04, room: 0.44, wet: 0.42, tone: 0.55, air: 0.12, stable: 0.5, double: 0 },
+  normalTalk: {
+    label: '普通に話したい',
+    params: { mic: 0.5, echo: 0, reverb: 0, room: 0.42, wet: 0.38, tone: 0.56, air: 0.12, stable: 0.54, double: 0 },
     reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1800, gain: 1.2, q: 0.7 }] },
-    bypassed: { ...DEFAULTS.bypassed, echo: true, double: true }
+    bypassed: { ...DEFAULTS.bypassed, echo: true, reverb: true, double: true }
   },
-  softReverb: {
-    label: '控えめリバーブ',
-    params: { mic: 0.5, echo: 0.08, reverb: 0.18, room: 0.56, wet: 0.58, tone: 0.54, air: 0.18, stable: 0.38, double: 0.02 },
-    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2400, gain: 2, q: 0.82 }] },
+  singingVoice: {
+    label: '歌いたい',
+    params: { mic: 0.5, echo: 0.26, reverb: 0.42, room: 0.74, wet: 0.74, tone: 0.57, air: 0.3, stable: 0.32, double: 0.12 },
+    reverbDetail: { selectedBandId: 'band-2', bands: [
+      { id: 'band-1', freq: 520, gain: -1.2, q: 0.7 },
+      { id: 'band-2', freq: 2400, gain: 3.2, q: 0.78 },
+      { id: 'band-3', freq: 5800, gain: 1.4, q: 0.9 }
+    ] },
+    bypassed: { ...DEFAULTS.bypassed }
+  },
+  radioVoice: {
+    label: 'ラジオっぽく話したい',
+    params: { mic: 0.48, echo: 0, reverb: 0, room: 0.36, wet: 0.32, tone: 0.48, air: 0.08, stable: 0.7, double: 0 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1600, gain: 0.8, q: 0.68 }] },
+    bypassed: { ...DEFAULTS.bypassed, echo: true, reverb: true, double: true }
+  },
+  clearEcho: {
+    label: 'わかりやすいエコー',
+    params: { mic: 0.5, echo: 0.4, reverb: 0.2, room: 0.52, wet: 0.72, tone: 0.56, air: 0.2, stable: 0.36, double: 0.04 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [
+      { id: 'band-1', freq: 2200, gain: 2.5, q: 0.76 },
+      { id: 'band-2', freq: 5000, gain: 1.0, q: 0.9 }
+    ] },
     bypassed: { ...DEFAULTS.bypassed }
   }
 };
@@ -58,38 +89,45 @@ const KNOBS = [
 const PRESETS = {
   default: {
     label: 'Default',
-    params: { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0 },
-    reverbDetail: defaultReverbDetail(),
+    params: { mic: 0.5, echo: 0.4, reverb: 0.2, room: 0.52, wet: 0.72, tone: 0.56, air: 0.2, stable: 0.36, double: 0.04 },
+    reverbDetail: QUICK_TONES.clearEcho.reverbDetail,
     bypassed: { ...DEFAULTS.bypassed }
   },
   singing: {
     label: 'Sing',
-    params: { mic: 0.52, echo: 0.32, reverb: 0.38, room: 0.7, wet: 0.76, tone: 0.58, air: 0.28, stable: 0.42, double: 0.12 },
-    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2600, gain: 3.8, q: 0.75 }] },
+    params: { mic: 0.5, echo: 0.26, reverb: 0.42, room: 0.74, wet: 0.74, tone: 0.57, air: 0.3, stable: 0.32, double: 0.12 },
+    reverbDetail: QUICK_TONES.singingVoice.reverbDetail,
     bypassed: { ...DEFAULTS.bypassed }
   },
   talk: {
     label: 'Talk',
-    params: { mic: 0.5, echo: 0, reverb: 0, room: 0.44, wet: 0.45, tone: 0.55, air: 0.12, stable: 0.5, double: 0 },
-    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1800, gain: 1.2, q: 0.7 }] },
-    bypassed: { mic: false, echo: true, reverb: true, tone: false, stable: false, double: true }
+    params: { mic: 0.5, echo: 0, reverb: 0, room: 0.42, wet: 0.38, tone: 0.56, air: 0.12, stable: 0.54, double: 0 },
+    reverbDetail: QUICK_TONES.normalTalk.reverbDetail,
+    bypassed: { ...DEFAULTS.bypassed, echo: true, reverb: true, double: true }
   },
   preset1: {
     label: 'Preset 1',
-    params: { mic: 0.48, echo: 0.14, reverb: 0.18, room: 0.52, wet: 0.62, tone: 0.54, air: 0.18, stable: 0.44, double: 0.08 },
-    reverbDetail: defaultReverbDetail(),
+    params: { mic: 0.5, echo: 0.18, reverb: 0.14, room: 0.5, wet: 0.58, tone: 0.54, air: 0.16, stable: 0.42, double: 0.04 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [
+      { id: 'band-1', freq: 2100, gain: 1.8, q: 0.74 },
+      { id: 'band-2', freq: 4800, gain: 0.8, q: 0.9 }
+    ] },
     bypassed: { ...DEFAULTS.bypassed }
   },
   preset2: {
     label: 'Preset 2',
-    params: { mic: 0.46, echo: 0.06, reverb: 0.08, room: 0.38, wet: 0.52, tone: 0.62, air: 0.24, stable: 0.58, double: 0 },
-    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1400, gain: 0.8, q: 0.65 }] },
-    bypassed: { mic: false, echo: false, reverb: false, tone: false, stable: false, double: true }
+    params: { mic: 0.48, echo: 0.06, reverb: 0.06, room: 0.4, wet: 0.42, tone: 0.62, air: 0.2, stable: 0.58, double: 0 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1800, gain: 1.0, q: 0.7 }] },
+    bypassed: { ...DEFAULTS.bypassed, double: true }
   },
   preset3: {
     label: 'Preset 3',
-    params: { mic: 0.52, echo: 0.42, reverb: 0.44, room: 0.78, wet: 0.82, tone: 0.6, air: 0.34, stable: 0.36, double: 0.18 },
-    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 3100, gain: 4.2, q: 0.9 }] },
+    params: { mic: 0.5, echo: 0.34, reverb: 0.36, room: 0.8, wet: 0.78, tone: 0.48, air: 0.22, stable: 0.38, double: 0.14 },
+    reverbDetail: { selectedBandId: 'band-2', bands: [
+      { id: 'band-1', freq: 760, gain: 1.6, q: 0.64 },
+      { id: 'band-2', freq: 2600, gain: 2.4, q: 0.84 },
+      { id: 'band-3', freq: 6400, gain: -0.8, q: 0.86 }
+    ] },
     bypassed: { ...DEFAULTS.bypassed }
   }
 };
@@ -147,7 +185,7 @@ const reverbRemoveBandBtn = $('reverbRemoveBandBtn');
 const reverbFreqInput = $('reverbFreqInput');
 const reverbGainInput = $('reverbGainInput');
 const reverbQInput = $('reverbQInput');
-const quickToneStatus = $('quickToneStatus');
+const quickToneStatuses = document.querySelectorAll('[data-quick-tone-status]');
 
 init();
 
@@ -174,22 +212,25 @@ function loadState() {
     const migratedEnabled = parsed.enabled || parsed.visible || DEFAULTS.enabled;
     const analyzerPreferenceSet = parsed.analyzerPreferenceSet === true;
     const preset = normalizePreset(parsed.preset);
-    const presetOverrides = sanitizePresetOverrides(parsed.presetOverrides);
-    if (!presetOverrides[preset] && parsed.params) {
+    const presetsAreCurrent = parsed.presetDefaultsVersion === PRESET_DEFAULTS_VERSION;
+    const presetOverrides = presetsAreCurrent ? sanitizePresetOverrides(parsed.presetOverrides) : {};
+    if (presetsAreCurrent && !presetOverrides[preset] && parsed.params) {
       presetOverrides[preset] = {
         params: sanitizePresetParams(parsed.params),
         bypassed: sanitizePresetBypassed(parsed.bypassed, { ...DEFAULTS.bypassed, ...PRESETS[preset].bypassed })
       };
     }
+    const factoryPreset = PRESETS[preset];
     return {
       ...structuredClone(DEFAULTS),
       ...parsed,
-      params: { ...DEFAULTS.params, ...parsed.params },
+      params: presetsAreCurrent ? { ...DEFAULTS.params, ...parsed.params } : { ...DEFAULTS.params, ...factoryPreset.params },
       enabled: { ...DEFAULTS.enabled, ...migratedEnabled },
-      bypassed: { ...DEFAULTS.bypassed, ...parsed.bypassed },
-      reverbDetail: sanitizeReverbDetail(parsed.reverbDetail),
+      bypassed: presetsAreCurrent ? { ...DEFAULTS.bypassed, ...parsed.bypassed } : { ...DEFAULTS.bypassed, ...factoryPreset.bypassed },
+      reverbDetail: presetsAreCurrent ? sanitizeReverbDetail(parsed.reverbDetail) : sanitizeReverbDetail(factoryPreset.reverbDetail),
       preset,
       presetOverrides,
+      presetDefaultsVersion: PRESET_DEFAULTS_VERSION,
       analyzerEnabled: analyzerPreferenceSet ? (parsed.analyzerEnabled ?? DEFAULTS.analyzerEnabled) : DEFAULTS.analyzerEnabled,
       analyzerPreferenceSet
     };
@@ -254,6 +295,7 @@ function bindUi() {
   });
   $('settingsBtn').addEventListener('click', () => $('settingsDialog').showModal());
   $('helpBtn').addEventListener('click', () => $('helpDialog').showModal());
+  $('quickSetupBtn').addEventListener('click', () => $('quickSetupDialog').showModal());
   document.querySelectorAll('[data-quick-tone]').forEach((button) => {
     button.addEventListener('click', () => applyQuickTone(button.dataset.quickTone));
   });
@@ -1395,7 +1437,13 @@ function applyQuickTone(key) {
   sendParams();
   sendEnabled();
   renderRuntimeStats();
-  if (quickToneStatus) quickToneStatus.textContent = `${tone.label}を反映しました。必要ならノブで微調整できます。`;
+  setQuickToneStatus(`${tone.label}を反映しました。必要ならノブで微調整できます。`);
+}
+
+function setQuickToneStatus(message) {
+  quickToneStatuses.forEach((status) => {
+    status.textContent = message;
+  });
 }
 
 function applyPreset(key) {

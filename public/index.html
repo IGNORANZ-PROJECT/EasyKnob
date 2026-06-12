@@ -62,6 +62,7 @@
       </div>
       <div class="top-actions">
         <button id="helpBtn" class="ghost intro-btn" type="button">初めての方へ</button>
+        <button id="quickSetupBtn" class="ghost quick-setup-btn" type="button">ワンクリックで簡単設定</button>
         <button id="settingsBtn" class="ghost" type="button">設定</button>
       </div>
     </header>
@@ -145,6 +146,30 @@
       </div>
       <menu>
         <button id="noticeAcceptBtn" class="primary" type="button">確認して始める</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="quickSetupDialog" class="modal quick-setup-modal">
+    <form method="dialog" class="modal-card quick-setup-card">
+      <header>
+        <h2>ワンクリックで簡単設定</h2>
+        <button class="icon-btn" value="close" aria-label="閉じる">×</button>
+      </header>
+      <section class="help-section help-quick">
+        <h3>触らずに音を作る</h3>
+        <p>用途に近いボタンを押すだけで、ノブ、ON/OFF、REVERB詳細をまとめて反映します。反映後に必要なところだけ微調整してください。</p>
+        <div class="quick-tone-grid">
+          <button type="button" data-quick-tone="catchphrase"><strong>決め台詞を決めたい</strong><span>前に出る声と、分かりやすく返るエコー。</span></button>
+          <button type="button" data-quick-tone="godVoice"><strong>神っぽく話したい</strong><span>広い空間、深めの響き、ゆっくり残る演出。</span></button>
+          <button type="button" data-quick-tone="normalTalk"><strong>普通に話したい</strong><span>遅延とクセを抑えた、聞き取りやすい会話。</span></button>
+          <button type="button" data-quick-tone="singingVoice"><strong>歌いたい</strong><span>歌用の広がり、抜け、軽い厚み。</span></button>
+          <button type="button" data-quick-tone="radioVoice"><strong>ラジオっぽく話したい</strong><span>近く、安定した、余計な響きの少ない声。</span></button>
+        </div>
+        <p class="quick-tone-status" data-quick-tone-status aria-live="polite"></p>
+      </section>
+      <menu>
+        <button class="primary" value="close">閉じる</button>
       </menu>
     </form>
   </dialog>
@@ -282,12 +307,13 @@
         <h3>触らずに音を作る</h3>
         <p>よく使う音はボタンだけで反映できます。音を出した後に、必要なところだけノブで微調整してください。</p>
         <div class="quick-tone-grid">
-          <button type="button" data-quick-tone="clearEcho">大きめエコー</button>
-          <button type="button" data-quick-tone="singReady">歌向け</button>
-          <button type="button" data-quick-tone="talkReady">会話向け</button>
-          <button type="button" data-quick-tone="softReverb">控えめリバーブ</button>
+          <button type="button" data-quick-tone="catchphrase"><strong>決め台詞を決めたい</strong><span>前に出る声と、分かりやすく返るエコー。</span></button>
+          <button type="button" data-quick-tone="godVoice"><strong>神っぽく話したい</strong><span>広い空間、深めの響き、ゆっくり残る演出。</span></button>
+          <button type="button" data-quick-tone="normalTalk"><strong>普通に話したい</strong><span>遅延とクセを抑えた、聞き取りやすい会話。</span></button>
+          <button type="button" data-quick-tone="singingVoice"><strong>歌いたい</strong><span>歌用の広がり、抜け、軽い厚み。</span></button>
+          <button type="button" data-quick-tone="radioVoice"><strong>ラジオっぽく話したい</strong><span>近く、安定した、余計な響きの少ない声。</span></button>
         </div>
-        <p id="quickToneStatus" class="quick-tone-status" aria-live="polite"></p>
+        <p class="quick-tone-status" data-quick-tone-status aria-live="polite"></p>
       </section>
 
       <section class="help-section">
