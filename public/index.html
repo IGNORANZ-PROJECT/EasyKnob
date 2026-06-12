@@ -136,7 +136,7 @@
         <p class="muted">EasyKnobを使う前に、プライバシーと音量に関する注意を確認してください。</p>
         <ul class="notice-list">
           <li><strong>マイク音声はサーバーへ送信しません。</strong><span>音声処理はブラウザ内で行われます。</span></li>
-          <li><strong>マイク権限が必要です。</strong><span>ONを押すと、ブラウザからマイク使用許可を求められます。</span></li>
+          <li><strong>マイク権限が必要です。</strong><span>初回はONを押すまで許可画面は表示されません。ONを押した後、ブラウザのマイク使用を許可してください。</span></li>
           <li><strong>音量に注意してください。</strong><span>ヘッドホンやスピーカーの音量を低めにしてから起動してください。</span></li>
           <li><strong>外部アプリ側の設定も影響します。</strong><span>Discord、OBS、VRChat、VB-CABLE、BlackHoleなどの設定によって、音質や遅延が変わります。</span></li>
           <li><strong>利用は自己責任です。</strong><span>聴覚、機器、配信、通話、OSやブラウザ設定に関する問題について、作者およびIGNORANZ PROJECTは責任を負いません。</span></li>
@@ -219,9 +219,34 @@
         <button class="icon-btn" value="close" aria-label="閉じる">×</button>
       </header>
 
-      <section>
-        <h3>使用の前に</h3>
-        <p>EasyKnobはChromeまたはEdgeで使ってください。Discord、VRChat、OBSなどへ加工後の声を渡すには、仮想オーディオデバイスが必要です。</p>
+      <section class="help-section help-start">
+        <h3>まず最初に</h3>
+        <div class="help-hero">
+          <strong>初回のマイク許可は、ONを押した後に表示されます。</strong>
+          <p>Input、Output、Presetを選んでONを押してください。初回だけブラウザがマイク使用を確認します。許可すると状態がSTARTINGからLIVEに変わり、EasyKnobが動き始めます。</p>
+        </div>
+        <div class="help-step-grid" aria-label="EasyKnob quick start">
+          <article>
+            <b>1</b>
+            <strong>Chrome / Edgeで開く</strong>
+            <span>Output選択を使うため、デスクトップ版ChromeまたはEdgeがおすすめです。</span>
+          </article>
+          <article>
+            <b>2</b>
+            <strong>InputとOutputを選ぶ</strong>
+            <span>Inputは使うマイク、OutputはCABLE InputやBlackHoleなどを選びます。</span>
+          </article>
+          <article>
+            <b>3</b>
+            <strong>ONを押して許可</strong>
+            <span>初回はここでマイク許可が出ます。許可しないと音声処理は開始されません。</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="help-section">
+        <h3>Windows / Mac の接続</h3>
+        <p>Discord、VRChat、OBSなどへ加工後の声を渡すには、仮想オーディオデバイスを使います。</p>
         <div class="setup-accordion">
           <details open>
             <summary>Windowsの方</summary>
@@ -233,6 +258,7 @@
               <li>Install Driverを押し、完了したらWindowsを再起動します。</li>
               <li>EasyKnobのOutputを <strong>CABLE Input</strong> にします。</li>
               <li>Discord、VRChat、OBSなどの入力デバイスを <strong>CABLE Output</strong> にします。</li>
+              <li>EasyKnobのONを押します。初回はここでブラウザのマイク許可が出るので、許可してください。</li>
               <li>外部アプリ側のノイズ抑制、エコー除去、自動ゲイン調整はOFF推奨です。</li>
             </ol>
           </details>
@@ -245,15 +271,16 @@
               <li>Audio MIDI設定を開き、BlackHoleが表示されていることを確認します。</li>
               <li>EasyKnobのOutputを <strong>BlackHole</strong> にします。</li>
               <li>Discord、VRChat、OBSなどの入力デバイスを <strong>BlackHole</strong> にします。</li>
+              <li>EasyKnobのONを押します。初回はここでブラウザのマイク許可が出るので、許可してください。</li>
               <li>外部アプリ側のノイズ抑制、エコー除去、自動ゲイン調整はOFF推奨です。</li>
             </ol>
           </details>
         </div>
       </section>
 
-      <section>
+      <section class="help-section help-quick">
         <h3>触らずに音を作る</h3>
-        <p>Knobを触らなくても、下のボタンだけでよく使う設定を反映できます。反映後に必要ならノブで微調整してください。</p>
+        <p>よく使う音はボタンだけで反映できます。音を出した後に、必要なところだけノブで微調整してください。</p>
         <div class="quick-tone-grid">
           <button type="button" data-quick-tone="clearEcho">大きめエコー</button>
           <button type="button" data-quick-tone="singReady">歌向け</button>
@@ -263,46 +290,63 @@
         <p id="quickToneStatus" class="quick-tone-status" aria-live="polite"></p>
       </section>
 
-      <section>
-        <h3>設定と使い方</h3>
-        <p>基本はInput、Output、Presetを選んでONを押します。状態がLIVEになれば動作中です。</p>
-        <ul>
-          <li><strong>MIC</strong>: マイク入力の大きさです。0にするとEasyKnobから出る声も0になります。</li>
-          <li><strong>ECHO</strong>: 後ろで小さく返ってくる遅れ音です。</li>
-          <li><strong>REVERB</strong>: 声の後ろに響きを足します。詳細ボタンからグラフ、FREQ、GAIN、Q、複数ポイントを調整できます。</li>
-          <li><strong>ROOM</strong>: 空間の広さや左右の広がりです。</li>
-          <li><strong>WET</strong>: エフェクト音の混ざり具合です。下げるほど原音に近くなります。</li>
-          <li><strong>TONE</strong>: 声の明るさです。</li>
-          <li><strong>AIR</strong>: 高域の抜けや空気感です。</li>
-          <li><strong>STABLE</strong>: 音量差や刺さる部分を抑えて声を安定させます。</li>
-          <li><strong>DOUBLE</strong>: 声を少し重ねて厚みを足します。</li>
-        </ul>
-        <p>PresetはDefault、Sing、Talk、Preset 1から3を選べます。ノブ値やON/OFF、REVERB詳細は自動保存されます。ON/OFF表示を押すと、そのノブだけ一時的に無効化できます。</p>
-        <p>さらに詳しいKnob(ノブ)の説明は、設定画面の各項目にも記載しています。</p>
+      <section class="help-section">
+        <h3>画面の見方</h3>
+        <div class="help-info-grid">
+          <article>
+            <h4>基本操作</h4>
+            <p>Input、Output、Presetを選んでONを押します。LIVEと表示されたら動作中です。RESETはプリセットを変えずに、現在のパラメーターだけ戻します。</p>
+          </article>
+          <article>
+            <h4>プリセット</h4>
+            <p>Default、Sing、Talk、Preset 1から3を選べます。変更したノブ値、ON/OFF、REVERB詳細はブラウザに自動保存されます。</p>
+          </article>
+          <article>
+            <h4>REVERB 詳細</h4>
+            <p>REVERBの詳細ボタンから、Hzグラフ上のポイントを追加、削除、ドラッグできます。選択中のポイントはFREQ、GAIN、Qで細かく調整できます。</p>
+          </article>
+          <article>
+            <h4>ノブのON/OFF</h4>
+            <p>各ノブ右上のON/OFF表示を押すと、そのノブだけ一時的に無効化できます。設定画面で無効化したノブは非表示になり、処理からも外れます。</p>
+          </article>
+        </div>
+        <div class="knob-help-list" aria-label="Knob descriptions">
+          <span><strong>MIC</strong>入力音量。0でEasyKnobから出る声も0。</span>
+          <span><strong>ECHO</strong>後ろで小さく返る遅れ音。</span>
+          <span><strong>REVERB</strong>声の後ろに響きを足す。</span>
+          <span><strong>ROOM</strong>空間の広さと左右の広がり。</span>
+          <span><strong>WET</strong>エフェクト音の混ざり具合。</span>
+          <span><strong>TONE</strong>声の明るさ。</span>
+          <span><strong>AIR</strong>高域の抜けと空気感。</span>
+          <span><strong>STABLE</strong>音量差や刺さる部分を抑える。</span>
+          <span><strong>DOUBLE</strong>声を少し重ねて厚みを足す。</span>
+        </div>
+        <p class="help-note">さらに詳しいKnob(ノブ)の説明は、設定画面の各項目にも記載しています。</p>
       </section>
 
-      <section>
-        <h3>トラブルシューティング: 遅延・音質</h3>
-        <p>音質を優先する場合は、Discordや配信ソフト側のノイズ抑制、エコー除去、自動ゲイン調整をOFFにしてください。Windows側の音声拡張、空間オーディオ、メーカー製マイク補正もOFF推奨です。</p>
-        <p>遅延が気になる場合は、Windowsの「このデバイスを聴く」、Discordのマイクテスト、OBSの音声モニタリングなど、別経路の監視音をOFFにしてください。</p>
-        <p>EasyKnob側では、不要なSTABLE、ECHO、REVERB、ROOM、WET、AIR、DOUBLEをOFFまたは低めにすると原音に近くなります。AUDIO ANALYZERも不要な時はOFF推奨です。</p>
-        <p>各Knob(ノブ)の役割は、設定画面のノブ一覧に記載しています。</p>
-      </section>
-
-      <section>
-        <h3>トラブルシューティング: ハウリング</h3>
-        <p>スピーカーから出した音をマイクが拾うとハウリングします。基本はヘッドホンか仮想オーディオ出力を使い、スピーカー監視は避けてください。HOWLが出る時は、MIC、WET、ECHO、REVERB、DOUBLEを下げ、Outputをスピーカー以外にしてください。</p>
-      </section>
-
-      <section>
-        <h3>トラブルシューティング: 音が出ない時</h3>
-        <ul>
-          <li>ブラウザのマイク許可がブロックされていないか確認してください。</li>
-          <li>Outputと、DiscordやVRChat側の入力デバイスの組み合わせを確認してください。</li>
-          <li>Windowsの場合、Discord側はCABLE Output、EasyKnob側はCABLE Inputです。</li>
-          <li>Macの場合、EasyKnob側も外部アプリ側もBlackHoleを選ぶ構成が基本です。</li>
-          <li>別アプリのマイクテストやモニタリングを同時に使うと、遅延や二重音の原因になります。</li>
-        </ul>
+      <section class="help-section">
+        <h3>困った時</h3>
+        <div class="trouble-grid">
+          <article>
+            <h4>音が出ない</h4>
+            <p>初回はONを押した後にマイク許可が出ます。ブロックした場合は、ブラウザのサイト設定からEasyKnobのマイクを許可してください。</p>
+            <p>WindowsはEasyKnobのOutputをCABLE Input、外部アプリの入力をCABLE Outputにします。MacはEasyKnob側も外部アプリ側もBlackHoleが基本です。</p>
+          </article>
+          <article>
+            <h4>遅延・音質</h4>
+            <p>DiscordやOBS側のノイズ抑制、エコー除去、自動ゲイン調整はOFF推奨です。Windowsの音声拡張、空間オーディオ、メーカー製マイク補正もOFFにしてください。</p>
+            <p>Windowsの「このデバイスを聴く」、Discordのマイクテスト、OBSの音声モニタリングなど、別経路の監視音もOFF推奨です。</p>
+          </article>
+          <article>
+            <h4>ハウリング</h4>
+            <p>スピーカーから出した音をマイクが拾うとハウリングします。基本はヘッドホンか仮想オーディオ出力を使ってください。</p>
+            <p>HOWLが出る時は、MIC、WET、ECHO、REVERB、DOUBLEを下げ、Outputをスピーカー以外にしてください。</p>
+          </article>
+          <article>
+            <h4>重い・不安定</h4>
+            <p>不要なSTABLE、ECHO、REVERB、ROOM、WET、AIR、DOUBLEをOFFまたは低めにしてください。AUDIO ANALYZERも不要な時はOFF推奨です。</p>
+          </article>
+        </div>
       </section>
 
       <section class="warning-box">

@@ -88,6 +88,26 @@ h3 { margin: 18px 0 6px; font-size: 16px; }
 .muted, .help-card p, .help-card li { color: var(--muted); line-height: 1.75; }
 .help-card ul, .help-card ol { padding-left: 1.25rem; }
 .help-card strong { color: var(--text); }
+.help-section { padding-top: 2px; }
+.help-section + .help-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.help-card h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: .02em; }
+.help-card h4 { margin: 0 0 6px; color: var(--text); font-size: 13px; letter-spacing: .02em; }
+.help-hero { border: 1px solid rgba(255,204,102,.46); border-radius: 8px; background: rgba(255,204,102,.08); padding: 13px 14px; }
+.help-hero strong { display: block; color: #ffe0a3; font-size: 14px; }
+.help-hero p { margin: 6px 0 0; }
+.help-step-grid, .help-info-grid, .trouble-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.help-info-grid, .trouble-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.help-step-grid article, .help-info-grid article, .trouble-grid article { border: 1px solid var(--line); border-radius: 8px; background: #0c0e12; padding: 13px; }
+.help-step-grid article { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; }
+.help-step-grid b { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(84,240,194,.12); color: var(--accent); font-size: 12px; }
+.help-step-grid strong { align-self: center; font-size: 13px; }
+.help-step-grid span { grid-column: 2; color: var(--muted); line-height: 1.55; font-size: 13px; }
+.help-info-grid p, .trouble-grid p { margin: 0; }
+.help-info-grid p + p, .trouble-grid p + p { margin-top: 8px; }
+.knob-help-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.knob-help-list span { border: 1px solid rgba(255,255,255,.08); border-radius: 6px; background: rgba(255,255,255,.03); padding: 9px 10px; color: var(--muted); line-height: 1.5; font-size: 12px; }
+.knob-help-list strong { display: block; color: var(--accent); font-size: 11px; letter-spacing: .08em; }
+.help-note { margin: 12px 0 0; color: #ffe0a3 !important; font-size: 13px; }
 .help-card details { border: 1px solid var(--line); border-radius: 8px; background: #0c0e12; padding: 0; overflow: hidden; }
 .help-card details + details { margin-top: 10px; }
 .help-card summary { list-style: none; cursor: pointer; padding: 13px 14px; color: var(--text); font-weight: 900; border-bottom: 1px solid transparent; }
@@ -144,6 +164,7 @@ menu { display: flex; justify-content: flex-end; gap: 10px; padding: 0; margin: 
   .topbar { align-items: flex-start; flex-direction: column; }
   .routing-card { grid-template-columns: 1fr; }
   .knob-grid { grid-template-columns: 1fr 1fr; }
+  .help-step-grid, .help-info-grid, .trouble-grid, .knob-help-list { grid-template-columns: 1fr; }
   #reverbEqCanvas { height: 240px; }
 }
 

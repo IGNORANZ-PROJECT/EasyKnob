@@ -56,7 +56,8 @@ EasyKnob は Web Audio API と AudioWorklet を使って、マイク入力をブ
 2. Chrome または Edge で EasyKnob を開きます。
 3. EasyKnob の `Output` を `CABLE Input` にします。
 4. Discord、VRChat などの入力デバイスを `CABLE Output` にします。
-5. EasyKnob を `ON` にして、ノブを調整します。
+5. EasyKnob を `ON` にします。初回はONを押した後にブラウザのマイク許可が表示されるので、許可してください。
+6. 状態が `LIVE` になったら、ノブや簡単設定ボタンで音を調整します。
 
 ## macOS / BlackHole
 
@@ -64,7 +65,8 @@ EasyKnob は Web Audio API と AudioWorklet を使って、マイク入力をブ
 2. Chrome または Edge で EasyKnob を開きます。
 3. EasyKnob の `Output` を `BlackHole` にします。
 4. Discord、VRChat などの入力デバイスを `BlackHole` にします。
-5. EasyKnob を `ON` にして、ノブを調整します。
+5. EasyKnob を `ON` にします。初回はONを押した後にブラウザのマイク許可が表示されるので、許可してください。
+6. 状態が `LIVE` になったら、ノブや簡単設定ボタンで音を調整します。
 
 ## セキュリティとプライバシー
 
