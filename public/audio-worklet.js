@@ -4,7 +4,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.sampleRate = sampleRate;
     this.params = { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0, quality: 'maximum' };
     this.enabled = { mic: true, echo: true, reverb: true, room: true, wet: true, tone: true, air: true, stable: true, double: true };
-    this.reverbDetail = { freq: 2200, gain: 3, q: 0.85 };
+    this.reverbDetail = { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2200, gain: 3, q: 0.85 }] };
     this.delayBuffer = new Float32Array(Math.ceil(this.sampleRate * 1.4));
     this.doubleBuffer = new Float32Array(Math.ceil(this.sampleRate * 0.08));
     this.revPreBuffer = new Float32Array(Math.ceil(this.sampleRate * 0.18));
@@ -43,6 +43,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.revEqInL2 = 0;
     this.revEqInR1 = 0;
     this.revEqInR2 = 0;
+    this.revEqState = this.createReverbEqStates(4);
     this.airLowL = 0;
     this.airLowR = 0;
     this.lfo = 0;
@@ -51,7 +52,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.micMuted = false;
     this.port.onmessage = (event) => {
       if (event.data.type === 'params') this.params = { ...this.params, ...event.data.params };
-      if (event.data.type === 'reverbDetail') this.reverbDetail = { ...this.reverbDetail, ...event.data.reverbDetail };
+      if (event.data.type === 'reverbDetail') this.reverbDetail = this.sanitizeReverbDetail(event.data.reverbDetail);
       if (event.data.type === 'enabled') this.enabled = { ...this.enabled, ...event.data.enabled };
       if (event.data.type === 'visible') this.enabled = { ...this.enabled, ...event.data.visible };
     };
@@ -63,6 +64,18 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
       buffer: new Float32Array(Math.max(8, Math.floor(this.sampleRate * seconds))),
       index: 0,
       damp: 0
+    }));
+  }
+  createReverbEqStates(count) {
+    return Array.from({ length: count }, () => ({
+      l1: 0,
+      l2: 0,
+      r1: 0,
+      r2: 0,
+      inL1: 0,
+      inL2: 0,
+      inR1: 0,
+      inR2: 0
     }));
   }
   clearDelayBank(bank) {
@@ -78,6 +91,27 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
   internalLimit(x, limit = 1.08) {
     if (!Number.isFinite(x)) return 0;
     return this.clamp(x, -limit, limit);
+  }
+  sanitizeReverbDetail(source) {
+    const sourceBands = Array.isArray(source?.bands) ? source.bands : [source || { freq: 2200, gain: 3, q: 0.85 }];
+    const bands = sourceBands.slice(0, this.revEqState?.length || 4).map((band, index) => {
+      const id = typeof band?.id === 'string' && band.id ? band.id : `band-${index + 1}`;
+      const freq = Number(band?.freq);
+      const gain = Number(band?.gain);
+      const q = Number(band?.q);
+      return {
+        id,
+        freq: Number.isFinite(freq) ? this.clamp(freq, 160, 12000) : 2200,
+        gain: Number.isFinite(gain) ? this.clamp(gain, -9, 9) : 0,
+        q: Number.isFinite(q) ? this.clamp(q, 0.25, 8) : 0.85
+      };
+    });
+    if (!bands.length) bands.push({ id: 'band-1', freq: 2200, gain: 3, q: 0.85 });
+    const selectedBandId = bands.some((band) => band.id === source?.selectedBandId) ? source.selectedBandId : bands[0].id;
+    return { selectedBandId, bands };
+  }
+  reverbBands() {
+    return this.sanitizeReverbDetail(this.reverbDetail).bands;
   }
   processComb(line, input, feedback, dampCoeff) {
     input = this.internalLimit(input, 0.72);
@@ -142,6 +176,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     this.revEqInL2 = 0;
     this.revEqInR1 = 0;
     this.revEqInR2 = 0;
+    this.revEqState = this.createReverbEqStates(this.revEqState?.length || 4);
     this.airLowL = 0;
     this.airLowR = 0;
   }
@@ -161,21 +196,46 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     const a2 = 1 - alpha / a;
     return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
   }
-  processReverbEq(x, c, right = false) {
-    if (right) {
-      const y = c.b0 * x + c.b1 * this.revEqInR1 + c.b2 * this.revEqInR2 - c.a1 * this.revEqR1 - c.a2 * this.revEqR2;
-      this.revEqInR2 = this.revEqInR1;
-      this.revEqInR1 = x;
-      this.revEqR2 = this.revEqR1;
-      this.revEqR1 = this.internalLimit(y, 0.96);
-      return this.revEqR1;
+  processReverbEq(x, bands, right = false) {
+    let y = x;
+    for (let i = 0; i < this.revEqState.length; i++) {
+      const state = this.revEqState[i];
+      const band = bands[i];
+      if (!band) {
+        this.decayReverbEqState(state);
+        continue;
+      }
+      const c = this.peakingCoefficients(band.freq, band.gain, band.q);
+      if (right) {
+        const out = c.b0 * y + c.b1 * state.inR1 + c.b2 * state.inR2 - c.a1 * state.r1 - c.a2 * state.r2;
+        state.inR2 = state.inR1;
+        state.inR1 = y;
+        state.r2 = state.r1;
+        state.r1 = this.internalLimit(out, 0.96);
+        y = state.r1;
+      } else {
+        const out = c.b0 * y + c.b1 * state.inL1 + c.b2 * state.inL2 - c.a1 * state.l1 - c.a2 * state.l2;
+        state.inL2 = state.inL1;
+        state.inL1 = y;
+        state.l2 = state.l1;
+        state.l1 = this.internalLimit(out, 0.96);
+        y = state.l1;
+      }
     }
-    const y = c.b0 * x + c.b1 * this.revEqInL1 + c.b2 * this.revEqInL2 - c.a1 * this.revEqL1 - c.a2 * this.revEqL2;
-    this.revEqInL2 = this.revEqInL1;
-    this.revEqInL1 = x;
-    this.revEqL2 = this.revEqL1;
-    this.revEqL1 = this.internalLimit(y, 0.96);
-    return this.revEqL1;
+    return y;
+  }
+  decayReverbEqState(state) {
+    state.l1 *= 0.98;
+    state.l2 *= 0.98;
+    state.r1 *= 0.98;
+    state.r2 *= 0.98;
+    state.inL1 *= 0.98;
+    state.inL2 *= 0.98;
+    state.inR1 *= 0.98;
+    state.inR2 *= 0.98;
+  }
+  decayReverbEqStates() {
+    for (const state of this.revEqState) this.decayReverbEqState(state);
   }
   publishStats(startedAt, frameLength, peak, clip = 0, guard = 1) {
     const endedAt = this.now();
@@ -240,7 +300,7 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     const wetRev = reverb * wet * (0.38 + room * 0.13);
     const reverbCount = this.qualityReverbCount();
     const revFeedback = this.clamp(0.52 + room * 0.14 + reverb * 0.1, 0.5, 0.78);
-    const revEq = this.peakingCoefficients(this.reverbDetail.freq, this.reverbDetail.gain, this.reverbDetail.q);
+    const revEqBands = this.reverbBands();
     const revDamp = this.clamp(0.18 + air * 0.44 + (1 - room) * 0.08, 0.12, 0.72);
     const preDelaySamples = Math.floor(this.sampleRate * (0.007 + room * 0.034));
     const earlySize = 0.72 + room * 1.35;
@@ -428,17 +488,14 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
         const blurredSide = this.revSideBlur * 0.9 + tailSideRaw * 0.1;
         const side = this.internalLimit((this.revEarlySideBlur * 0.28 + blurredSide) * (0.1 + room * 0.22), 0.42);
         const center = this.internalLimit(earlyCenter * 0.24 + tailCenter * 0.78, 0.72);
-        const revL = this.processReverbEq(center + side, revEq);
-        const revR = this.processReverbEq(center - side, revEq, true);
+        const revL = this.processReverbEq(center + side, revEqBands);
+        const revR = this.processReverbEq(center - side, revEqBands, true);
         l += revL * wetRev * fxGuard;
         r += revR * wetRev * fxGuard;
       } else {
         this.revSideBlur += (0 - this.revSideBlur) * 0.02;
         this.revEarlySideBlur += (0 - this.revEarlySideBlur) * 0.04;
-        this.revEqL1 *= 0.98;
-        this.revEqL2 *= 0.98;
-        this.revEqR1 *= 0.98;
-        this.revEqR2 *= 0.98;
+        this.decayReverbEqStates();
       }
       this.revPreIndex = (this.revPreIndex + 1) % this.revPreBuffer.length;
 

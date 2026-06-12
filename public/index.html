@@ -178,6 +178,13 @@
       <section class="reverb-eq-stage" aria-label="REVERB EQ">
         <canvas id="reverbEqCanvas" aria-label="REVERB EQカーブ"></canvas>
       </section>
+      <section class="reverb-band-bar" aria-label="REVERB EQ points">
+        <div id="reverbBandList" class="reverb-band-list"></div>
+        <div class="reverb-band-actions">
+          <button id="reverbAddBandBtn" class="ghost" type="button">ポイント追加</button>
+          <button id="reverbRemoveBandBtn" class="ghost" type="button">削除</button>
+        </div>
+      </section>
       <section class="reverb-detail-controls" aria-label="REVERB EQ controls">
         <label class="detail-knob">
           <span>FREQ</span>
@@ -213,58 +220,56 @@
       </header>
 
       <section>
-        <h3>EasyKnobでできること</h3>
-        <p>EasyKnobは、マイクの声にECHOやREVERBなどをかけて、Discord、VRChat、OBS、通話アプリなどへ渡すためのブラウザアプリです。音声処理はブラウザ内で行い、マイク音声をサーバーへ送信しません。</p>
-        <p>まずはInputでマイク、Outputで出力先を選び、ONを押します。ブラウザのマイク許可が出たら許可してください。</p>
+        <h3>使用の前に</h3>
+        <p>EasyKnobはChromeまたはEdgeで使ってください。Discord、VRChat、OBSなどへ加工後の声を渡すには、仮想オーディオデバイスが必要です。</p>
+        <div class="setup-accordion">
+          <details open>
+            <summary>Windowsの方</summary>
+            <ol>
+              <li>ChromeまたはEdgeでEasyKnobを開きます。Safariや一部ブラウザではOutput選択が使えません。</li>
+              <li>VB-CABLEの公式サイトからWindows用のZIPをダウンロードします。</li>
+              <li>ZIPを右クリックして展開します。展開せずにZIP内から実行すると失敗する場合があります。</li>
+              <li>展開したフォルダ内の <strong>VBCABLE_Setup_x64.exe</strong>、環境によっては <strong>VBCABLE_Setup.exe</strong> を右クリックし、管理者として実行します。</li>
+              <li>Install Driverを押し、完了したらWindowsを再起動します。</li>
+              <li>EasyKnobのOutputを <strong>CABLE Input</strong> にします。</li>
+              <li>Discord、VRChat、OBSなどの入力デバイスを <strong>CABLE Output</strong> にします。</li>
+              <li>外部アプリ側のノイズ抑制、エコー除去、自動ゲイン調整はOFF推奨です。</li>
+            </ol>
+          </details>
+          <details>
+            <summary>Macの方</summary>
+            <ol>
+              <li>ChromeまたはEdgeでEasyKnobを開きます。SafariではOutput選択が使えない場合があります。</li>
+              <li>BlackHoleの公式配布元から2ch版をインストールします。</li>
+              <li>インストール後、必要に応じてMacを再起動します。</li>
+              <li>Audio MIDI設定を開き、BlackHoleが表示されていることを確認します。</li>
+              <li>EasyKnobのOutputを <strong>BlackHole</strong> にします。</li>
+              <li>Discord、VRChat、OBSなどの入力デバイスを <strong>BlackHole</strong> にします。</li>
+              <li>外部アプリ側のノイズ抑制、エコー除去、自動ゲイン調整はOFF推奨です。</li>
+            </ol>
+          </details>
+        </div>
       </section>
 
       <section>
-        <h3>基本の使い方</h3>
-        <ol>
-          <li><strong>Input</strong> で使うマイクを選びます。迷ったらDefaultのままで構いません。</li>
-          <li><strong>Output</strong> で音を出す先を選びます。DiscordやVRChatに渡す場合はVB-CABLEやBlackHoleを選びます。</li>
-          <li><strong>Preset</strong> で用途に近い音を選びます。歌ならSing、会話ならTalkが目安です。</li>
-          <li><strong>ON</strong> を押して起動します。状態がLIVEになれば動作中です。</li>
-          <li>ノブを回して音を調整します。ON/OFF表示を押すと、そのノブだけ一時的に無効化できます。</li>
-        </ol>
+        <h3>触らずに音を作る</h3>
+        <p>Knobを触らなくても、下のボタンだけでよく使う設定を反映できます。反映後に必要ならノブで微調整してください。</p>
+        <div class="quick-tone-grid">
+          <button type="button" data-quick-tone="clearEcho">大きめエコー</button>
+          <button type="button" data-quick-tone="singReady">歌向け</button>
+          <button type="button" data-quick-tone="talkReady">会話向け</button>
+          <button type="button" data-quick-tone="softReverb">控えめリバーブ</button>
+        </div>
+        <p id="quickToneStatus" class="quick-tone-status" aria-live="polite"></p>
       </section>
 
       <section>
-        <h3>外部アプリへ渡す時に必要なもの</h3>
-        <p>EasyKnob本体はブラウザだけで動きます。ただしDiscordやVRChatに加工後の声を渡すには、仮想オーディオデバイスが必要です。</p>
-        <ul>
-          <li>Windows: VB-CABLE</li>
-          <li>Mac: BlackHole</li>
-          <li>推奨ブラウザ: Chrome / Edge</li>
-        </ul>
-      </section>
-
-      <section>
-        <h3>Windows / VB-CABLE</h3>
-        <ol>
-          <li>VB-CABLEをインストールします。</li>
-          <li>EasyKnobのOutputを <strong>CABLE Input</strong> にします。</li>
-          <li>Discordなどの入力を <strong>CABLE Output</strong> にします。</li>
-          <li>Discord側のマイクテストやノイズ抑制をOFFにして、遅延や音質を確認します。</li>
-        </ol>
-      </section>
-
-      <section>
-        <h3>Mac / BlackHole</h3>
-        <ol>
-          <li>BlackHoleをインストールします。</li>
-          <li>EasyKnobのOutputを <strong>BlackHole</strong> にします。</li>
-          <li>Discordなどの入力を <strong>BlackHole</strong> にします。</li>
-          <li>必要に応じてAudio MIDI設定でBlackHoleの入出力を確認します。</li>
-        </ol>
-      </section>
-
-      <section>
-        <h3>ノブの意味</h3>
+        <h3>設定と使い方</h3>
+        <p>基本はInput、Output、Presetを選んでONを押します。状態がLIVEになれば動作中です。</p>
         <ul>
           <li><strong>MIC</strong>: マイク入力の大きさです。0にするとEasyKnobから出る声も0になります。</li>
           <li><strong>ECHO</strong>: 後ろで小さく返ってくる遅れ音です。</li>
-          <li><strong>REVERB</strong>: 声の後ろに響きを足します。REVERBカードの詳細ボタンからFREQ、GAIN、Qを調整できます。</li>
+          <li><strong>REVERB</strong>: 声の後ろに響きを足します。詳細ボタンからグラフ、FREQ、GAIN、Q、複数ポイントを調整できます。</li>
           <li><strong>ROOM</strong>: 空間の広さや左右の広がりです。</li>
           <li><strong>WET</strong>: エフェクト音の混ざり具合です。下げるほど原音に近くなります。</li>
           <li><strong>TONE</strong>: 声の明るさです。</li>
@@ -272,11 +277,12 @@
           <li><strong>STABLE</strong>: 音量差や刺さる部分を抑えて声を安定させます。</li>
           <li><strong>DOUBLE</strong>: 声を少し重ねて厚みを足します。</li>
         </ul>
-        <p>さらに詳しい説明は、設定画面の各Knob(ノブ)の項目にも記載しています。</p>
+        <p>PresetはDefault、Sing、Talk、Preset 1から3を選べます。ノブ値やON/OFF、REVERB詳細は自動保存されます。ON/OFF表示を押すと、そのノブだけ一時的に無効化できます。</p>
+        <p>さらに詳しいKnob(ノブ)の説明は、設定画面の各項目にも記載しています。</p>
       </section>
 
       <section>
-        <h3>低遅延・音質</h3>
+        <h3>トラブルシューティング: 遅延・音質</h3>
         <p>音質を優先する場合は、Discordや配信ソフト側のノイズ抑制、エコー除去、自動ゲイン調整をOFFにしてください。Windows側の音声拡張、空間オーディオ、メーカー製マイク補正もOFF推奨です。</p>
         <p>遅延が気になる場合は、Windowsの「このデバイスを聴く」、Discordのマイクテスト、OBSの音声モニタリングなど、別経路の監視音をOFFにしてください。</p>
         <p>EasyKnob側では、不要なSTABLE、ECHO、REVERB、ROOM、WET、AIR、DOUBLEをOFFまたは低めにすると原音に近くなります。AUDIO ANALYZERも不要な時はOFF推奨です。</p>
@@ -284,12 +290,12 @@
       </section>
 
       <section>
-        <h3>ハウリング対策</h3>
+        <h3>トラブルシューティング: ハウリング</h3>
         <p>スピーカーから出した音をマイクが拾うとハウリングします。基本はヘッドホンか仮想オーディオ出力を使い、スピーカー監視は避けてください。HOWLが出る時は、MIC、WET、ECHO、REVERB、DOUBLEを下げ、Outputをスピーカー以外にしてください。</p>
       </section>
 
       <section>
-        <h3>音が出ない時</h3>
+        <h3>トラブルシューティング: 音が出ない時</h3>
         <ul>
           <li>ブラウザのマイク許可がブロックされていないか確認してください。</li>
           <li>Outputと、DiscordやVRChat側の入力デバイスの組み合わせを確認してください。</li>

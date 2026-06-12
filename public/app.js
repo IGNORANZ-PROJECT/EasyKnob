@@ -1,16 +1,44 @@
-const REVERB_DETAIL_DEFAULTS = { freq: 2200, gain: 3, q: 0.85 };
+const MAX_REVERB_BANDS = 4;
+const REVERB_DETAIL_DEFAULTS = { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2200, gain: 3, q: 0.85 }] };
 
 const DEFAULTS = {
   params: { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0, quality: 'maximum' },
   enabled: { mic: true, echo: true, reverb: true, room: true, wet: true, tone: true, air: true, stable: true, double: true },
   bypassed: { mic: false, echo: false, reverb: false, room: false, wet: false, tone: false, air: false, stable: false, double: false },
-  reverbDetail: { ...REVERB_DETAIL_DEFAULTS },
+  reverbDetail: defaultReverbDetail(),
   preset: 'default',
   presetOverrides: {},
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
   micDeviceId: 'default',
   outputDeviceId: ''
+};
+
+const QUICK_TONES = {
+  clearEcho: {
+    label: '大きめエコー',
+    params: { mic: 0.5, echo: 0.5, reverb: 0.22, room: 0.54, wet: 0.78, tone: 0.56, air: 0.2, stable: 0.34, double: 0.04 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2200, gain: 2.4, q: 0.72 }] },
+    bypassed: { ...DEFAULTS.bypassed }
+  },
+  singReady: {
+    label: '歌向け',
+    params: { mic: 0.52, echo: 0.32, reverb: 0.38, room: 0.7, wet: 0.76, tone: 0.58, air: 0.28, stable: 0.42, double: 0.12 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2600, gain: 3.8, q: 0.75 }] },
+    bypassed: { ...DEFAULTS.bypassed }
+  },
+  talkReady: {
+    label: '会話向け',
+    params: { mic: 0.5, echo: 0, reverb: 0.04, room: 0.44, wet: 0.42, tone: 0.55, air: 0.12, stable: 0.5, double: 0 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1800, gain: 1.2, q: 0.7 }] },
+    bypassed: { ...DEFAULTS.bypassed, echo: true, double: true }
+  },
+  softReverb: {
+    label: '控えめリバーブ',
+    params: { mic: 0.5, echo: 0.08, reverb: 0.18, room: 0.56, wet: 0.58, tone: 0.54, air: 0.18, stable: 0.38, double: 0.02 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2400, gain: 2, q: 0.82 }] },
+    bypassed: { ...DEFAULTS.bypassed }
+  }
 };
 
 const FIRST_RUN_NOTICE_KEY = 'easyknob-first-run-notice-v1';
@@ -31,37 +59,37 @@ const PRESETS = {
   default: {
     label: 'Default',
     params: { mic: 0.5, echo: 0.22, reverb: 0.26, room: 0.58, wet: 0.7, tone: 0.5, air: 0.18, stable: 0.3, double: 0 },
-    reverbDetail: { ...REVERB_DETAIL_DEFAULTS },
+    reverbDetail: defaultReverbDetail(),
     bypassed: { ...DEFAULTS.bypassed }
   },
   singing: {
     label: 'Sing',
     params: { mic: 0.52, echo: 0.32, reverb: 0.38, room: 0.7, wet: 0.76, tone: 0.58, air: 0.28, stable: 0.42, double: 0.12 },
-    reverbDetail: { freq: 2600, gain: 3.8, q: 0.75 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 2600, gain: 3.8, q: 0.75 }] },
     bypassed: { ...DEFAULTS.bypassed }
   },
   talk: {
     label: 'Talk',
     params: { mic: 0.5, echo: 0, reverb: 0, room: 0.44, wet: 0.45, tone: 0.55, air: 0.12, stable: 0.5, double: 0 },
-    reverbDetail: { freq: 1800, gain: 1.2, q: 0.7 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1800, gain: 1.2, q: 0.7 }] },
     bypassed: { mic: false, echo: true, reverb: true, tone: false, stable: false, double: true }
   },
   preset1: {
     label: 'Preset 1',
     params: { mic: 0.48, echo: 0.14, reverb: 0.18, room: 0.52, wet: 0.62, tone: 0.54, air: 0.18, stable: 0.44, double: 0.08 },
-    reverbDetail: { ...REVERB_DETAIL_DEFAULTS },
+    reverbDetail: defaultReverbDetail(),
     bypassed: { ...DEFAULTS.bypassed }
   },
   preset2: {
     label: 'Preset 2',
     params: { mic: 0.46, echo: 0.06, reverb: 0.08, room: 0.38, wet: 0.52, tone: 0.62, air: 0.24, stable: 0.58, double: 0 },
-    reverbDetail: { freq: 1400, gain: 0.8, q: 0.65 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1400, gain: 0.8, q: 0.65 }] },
     bypassed: { mic: false, echo: false, reverb: false, tone: false, stable: false, double: true }
   },
   preset3: {
     label: 'Preset 3',
     params: { mic: 0.52, echo: 0.42, reverb: 0.44, room: 0.78, wet: 0.82, tone: 0.6, air: 0.34, stable: 0.36, double: 0.18 },
-    reverbDetail: { freq: 3100, gain: 4.2, q: 0.9 },
+    reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 3100, gain: 4.2, q: 0.9 }] },
     bypassed: { ...DEFAULTS.bypassed }
   }
 };
@@ -113,9 +141,13 @@ const firstRunNoticeDialog = $('firstRunNoticeDialog');
 const noticeAcceptBtn = $('noticeAcceptBtn');
 const reverbDetailDialog = $('reverbDetailDialog');
 const reverbEqCanvas = $('reverbEqCanvas');
+const reverbBandList = $('reverbBandList');
+const reverbAddBandBtn = $('reverbAddBandBtn');
+const reverbRemoveBandBtn = $('reverbRemoveBandBtn');
 const reverbFreqInput = $('reverbFreqInput');
 const reverbGainInput = $('reverbGainInput');
 const reverbQInput = $('reverbQInput');
+const quickToneStatus = $('quickToneStatus');
 
 init();
 
@@ -222,6 +254,9 @@ function bindUi() {
   });
   $('settingsBtn').addEventListener('click', () => $('settingsDialog').showModal());
   $('helpBtn').addEventListener('click', () => $('helpDialog').showModal());
+  document.querySelectorAll('[data-quick-tone]').forEach((button) => {
+    button.addEventListener('click', () => applyQuickTone(button.dataset.quickTone));
+  });
   bindReverbDetailUi();
   if (firstRunNoticeDialog) {
     firstRunNoticeDialog.addEventListener('cancel', (event) => event.preventDefault());
@@ -414,6 +449,9 @@ function bindReverbDetailUi() {
   reverbGainInput.addEventListener('input', () => updateReverbDetailFromUi());
   reverbQInput.addEventListener('input', () => updateReverbDetailFromUi());
   [reverbFreqInput, reverbGainInput, reverbQInput].forEach(bindDetailDial);
+  reverbAddBandBtn?.addEventListener('click', addReverbBand);
+  reverbRemoveBandBtn?.addEventListener('click', removeSelectedReverbBand);
+  bindReverbEqCanvas();
   window.addEventListener('resize', () => {
     if (reverbDetailDialog.open) drawReverbEq();
   });
@@ -425,7 +463,9 @@ function openReverbDetail() {
 }
 
 function updateReverbDetailFromUi() {
-  state.reverbDetail = sanitizeReverbDetail({
+  const detail = sanitizeReverbDetail(state.reverbDetail);
+  const selectedId = detail.selectedBandId;
+  state.reverbDetail = updateReverbBand(detail, selectedId, {
     freq: freqFromNormalized(Number(reverbFreqInput.value) / 100),
     gain: Number(reverbGainInput.value),
     q: Number(reverbQInput.value)
@@ -434,6 +474,100 @@ function updateReverbDetailFromUi() {
   saveState();
   sendReverbDetail();
   renderReverbDetail();
+}
+
+function addReverbBand() {
+  const detail = sanitizeReverbDetail(state.reverbDetail);
+  if (detail.bands.length >= MAX_REVERB_BANDS) return;
+  const seed = nextReverbBandSeed(detail.bands.length);
+  const nextBand = {
+    id: uniqueReverbBandId(detail.bands),
+    freq: seed.freq,
+    gain: seed.gain,
+    q: seed.q
+  };
+  state.reverbDetail = sanitizeReverbDetail({
+    selectedBandId: nextBand.id,
+    bands: [...detail.bands, nextBand]
+  });
+  saveCurrentPreset();
+  saveState();
+  sendReverbDetail();
+  renderReverbDetail();
+}
+
+function removeSelectedReverbBand() {
+  const detail = sanitizeReverbDetail(state.reverbDetail);
+  if (detail.bands.length <= 1) return;
+  const nextBands = detail.bands.filter((band) => band.id !== detail.selectedBandId);
+  state.reverbDetail = sanitizeReverbDetail({
+    selectedBandId: nextBands[Math.max(0, detail.bands.findIndex((band) => band.id === detail.selectedBandId) - 1)]?.id || nextBands[0]?.id,
+    bands: nextBands
+  });
+  saveCurrentPreset();
+  saveState();
+  sendReverbDetail();
+  renderReverbDetail();
+}
+
+function selectReverbBand(id) {
+  const detail = sanitizeReverbDetail(state.reverbDetail);
+  if (!detail.bands.some((band) => band.id === id)) return;
+  state.reverbDetail = { ...detail, selectedBandId: id };
+  saveCurrentPreset();
+  saveState();
+  renderReverbDetail();
+}
+
+function bindReverbEqCanvas() {
+  if (!reverbEqCanvas) return;
+  let dragging = false;
+
+  const updateFromPointer = (event, allowAdd = false) => {
+    const detail = sanitizeReverbDetail(state.reverbDetail);
+    const geometry = reverbEqGeometry(reverbEqCanvas.clientWidth, reverbEqCanvas.clientHeight);
+    const rect = reverbEqCanvas.getBoundingClientRect();
+    const x = clamp(event.clientX - rect.left, geometry.pad.left, geometry.width - geometry.pad.right);
+    const y = clamp(event.clientY - rect.top, geometry.pad.top, geometry.height - geometry.pad.bottom);
+    const nearest = nearestReverbBand(detail, x, y, geometry);
+    let selectedId = detail.selectedBandId;
+    if (nearest && nearest.distance < 24) {
+      selectedId = nearest.band.id;
+    } else if (allowAdd && detail.bands.length < MAX_REVERB_BANDS) {
+      const band = {
+        id: uniqueReverbBandId(detail.bands),
+        freq: freqFromEqX(x, geometry),
+        gain: dbFromEqY(y, geometry),
+        q: 0.85
+      };
+      state.reverbDetail = sanitizeReverbDetail({ selectedBandId: band.id, bands: [...detail.bands, band] });
+      selectedId = band.id;
+    }
+    state.reverbDetail = updateReverbBand(sanitizeReverbDetail(state.reverbDetail), selectedId, {
+      freq: freqFromEqX(x, geometry),
+      gain: dbFromEqY(y, geometry)
+    });
+    saveCurrentPreset();
+    saveState();
+    sendReverbDetail();
+    renderReverbDetail();
+  };
+
+  reverbEqCanvas.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    dragging = true;
+    reverbEqCanvas.setPointerCapture(event.pointerId);
+    updateFromPointer(event, true);
+  });
+  reverbEqCanvas.addEventListener('pointermove', (event) => {
+    if (dragging && reverbEqCanvas.hasPointerCapture(event.pointerId)) updateFromPointer(event);
+  });
+  const release = (event) => {
+    dragging = false;
+    if (reverbEqCanvas.hasPointerCapture(event.pointerId)) reverbEqCanvas.releasePointerCapture(event.pointerId);
+  };
+  reverbEqCanvas.addEventListener('pointerup', release);
+  reverbEqCanvas.addEventListener('pointercancel', release);
 }
 
 function bindDetailDial(input) {
@@ -519,13 +653,30 @@ function renderReverbDetail() {
   if (!reverbFreqInput || !reverbGainInput || !reverbQInput) return;
   const detail = sanitizeReverbDetail(state.reverbDetail);
   state.reverbDetail = detail;
-  reverbFreqInput.value = Math.round(normalizedFromFreq(detail.freq) * 100);
-  reverbGainInput.value = detail.gain.toFixed(1);
-  reverbQInput.value = detail.q.toFixed(2);
-  applyDetailKnobUi(reverbFreqInput, detailAngle(normalizedFromFreq(detail.freq)), formatFreq(detail.freq));
-  applyDetailKnobUi(reverbGainInput, detailAngle((detail.gain + 9) / 18), `${detail.gain >= 0 ? '+' : ''}${detail.gain.toFixed(1)} dB`);
-  applyDetailKnobUi(reverbQInput, detailAngle((detail.q - 0.25) / 7.75), detail.q.toFixed(2));
+  const band = selectedReverbBand(detail);
+  reverbFreqInput.value = Math.round(normalizedFromFreq(band.freq) * 100);
+  reverbGainInput.value = band.gain.toFixed(1);
+  reverbQInput.value = band.q.toFixed(2);
+  renderReverbBandList(detail);
+  applyDetailKnobUi(reverbFreqInput, detailAngle(normalizedFromFreq(band.freq)), formatFreq(band.freq));
+  applyDetailKnobUi(reverbGainInput, detailAngle((band.gain + 9) / 18), `${band.gain >= 0 ? '+' : ''}${band.gain.toFixed(1)} dB`);
+  applyDetailKnobUi(reverbQInput, detailAngle((band.q - 0.25) / 7.75), band.q.toFixed(2));
   drawReverbEq();
+}
+
+function renderReverbBandList(detail) {
+  if (!reverbBandList) return;
+  reverbBandList.innerHTML = '';
+  detail.bands.forEach((band, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `reverb-band-chip${band.id === detail.selectedBandId ? ' active' : ''}`;
+    button.textContent = `Point ${index + 1} ${formatFreq(band.freq)}`;
+    button.addEventListener('click', () => selectReverbBand(band.id));
+    reverbBandList.appendChild(button);
+  });
+  if (reverbAddBandBtn) reverbAddBandBtn.disabled = detail.bands.length >= MAX_REVERB_BANDS;
+  if (reverbRemoveBandBtn) reverbRemoveBandBtn.disabled = detail.bands.length <= 1;
 }
 
 function applyDetailKnobUi(input, angle, label) {
@@ -559,15 +710,10 @@ function drawReverbEq() {
 
 function paintReverbEq(ctx, width, height) {
   const detail = sanitizeReverbDetail(state.reverbDetail);
-  const minFreq = 80;
-  const maxFreq = 16000;
-  const minDb = -12;
-  const maxDb = 12;
-  const pad = { left: 44, right: 42, top: 18, bottom: 34 };
-  const plotWidth = width - pad.left - pad.right;
-  const plotHeight = height - pad.top - pad.bottom;
-  const freqToX = (freq) => pad.left + Math.log(freq / minFreq) / Math.log(maxFreq / minFreq) * plotWidth;
-  const dbToY = (db) => pad.top + (1 - ((db - minDb) / (maxDb - minDb))) * plotHeight;
+  const geometry = reverbEqGeometry(width, height);
+  const { minFreq, maxFreq, minDb, maxDb, pad } = geometry;
+  const freqToX = (freq) => freqToEqX(freq, geometry);
+  const dbToY = (db) => dbToEqY(db, geometry);
   const hzTicks = [100, 200, 500, 1000, 2000, 5000, 10000];
 
   ctx.clearRect(0, 0, width, height);
@@ -599,7 +745,7 @@ function paintReverbEq(ctx, width, height) {
 
   const points = [];
   for (let i = 0; i <= 180; i++) {
-    const x = pad.left + (i / 180) * plotWidth;
+    const x = pad.left + (i / 180) * geometry.plotWidth;
     const freq = minFreq * Math.pow(maxFreq / minFreq, i / 180);
     const db = reverbEqMagnitudeDb(freq, detail);
     points.push({ x, y: dbToY(db), db });
@@ -625,15 +771,23 @@ function paintReverbEq(ctx, width, height) {
   });
   ctx.stroke();
 
-  const pointX = freqToX(detail.freq);
-  const pointY = dbToY(detail.gain);
-  ctx.fillStyle = '#54f0c2';
-  ctx.strokeStyle = 'rgba(255,255,255,.9)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(pointX, pointY, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  detail.bands.forEach((band, index) => {
+    const selected = band.id === detail.selectedBandId;
+    const pointX = freqToX(band.freq);
+    const pointY = dbToY(band.gain);
+    ctx.fillStyle = selected ? '#54f0c2' : '#ffcc66';
+    ctx.strokeStyle = selected ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.72)';
+    ctx.lineWidth = selected ? 3 : 2;
+    ctx.beginPath();
+    ctx.arc(pointX, pointY, selected ? 8 : 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = selected ? '#f4f7fb' : 'rgba(244,247,251,.72)';
+    ctx.font = '10px Inter, ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`${index + 1}`, pointX, pointY - 11);
+  });
 
   ctx.fillStyle = 'rgba(244,247,251,.68)';
   ctx.font = '11px Inter, ui-sans-serif, system-ui, sans-serif';
@@ -654,11 +808,13 @@ function paintReverbEq(ctx, width, height) {
 
 function reverbEqMagnitudeDb(freq, detail) {
   const f = clamp(freq, 80, 16000);
-  const gain = clamp(detail.gain, -9, 9);
-  const q = clamp(detail.q, 0.25, 8);
-  const distance = Math.log2(f / detail.freq) * q;
-  const shape = Math.exp(-0.5 * distance * distance);
-  return gain * shape;
+  return clamp(detail.bands.reduce((sum, band) => {
+    const gain = clamp(band.gain, -9, 9);
+    const q = clamp(band.q, 0.25, 8);
+    const distance = Math.log2(f / band.freq) * q;
+    const shape = Math.exp(-0.5 * distance * distance);
+    return sum + gain * shape;
+  }, 0), -12, 12);
 }
 
 function applyKnobUi(card, value) {
@@ -1226,6 +1382,22 @@ function renderPresetSelect() {
   presetSelect.value = state.preset;
 }
 
+function applyQuickTone(key) {
+  const tone = QUICK_TONES[key];
+  if (!tone) return;
+  state.params = { ...state.params, ...tone.params };
+  state.bypassed = { ...DEFAULTS.bypassed, ...tone.bypassed };
+  state.reverbDetail = sanitizeReverbDetail(tone.reverbDetail);
+  saveCurrentPreset();
+  saveState();
+  renderKnobs();
+  renderReverbDetail();
+  sendParams();
+  sendEnabled();
+  renderRuntimeStats();
+  if (quickToneStatus) quickToneStatus.textContent = `${tone.label}を反映しました。必要ならノブで微調整できます。`;
+}
+
 function applyPreset(key) {
   state.preset = normalizePreset(key);
   const preset = getPresetState(state.preset);
@@ -1307,15 +1479,105 @@ function sanitizePresetBypassed(source, fallback = {}) {
 }
 
 function sanitizeReverbDetail(source) {
-  const detail = { ...REVERB_DETAIL_DEFAULTS, ...(source || {}) };
-  const freq = Number(detail.freq);
-  const gain = Number(detail.gain);
-  const q = Number(detail.q);
+  const sourceBands = Array.isArray(source?.bands) ? source.bands : [source || REVERB_DETAIL_DEFAULTS.bands[0]];
+  const usedIds = new Set();
+  const bands = sourceBands.slice(0, MAX_REVERB_BANDS).map((band, index) => {
+    const fallback = REVERB_DETAIL_DEFAULTS.bands[0];
+    const freq = Number(band?.freq);
+    const gain = Number(band?.gain);
+    const q = Number(band?.q);
+    let id = typeof band?.id === 'string' && band.id ? band.id : `band-${index + 1}`;
+    while (usedIds.has(id)) id = `band-${index + 1}-${usedIds.size + 1}`;
+    usedIds.add(id);
+    return {
+      id,
+      freq: Number.isFinite(freq) ? clamp(freq, 160, 12000) : fallback.freq,
+      gain: Number.isFinite(gain) ? clamp(gain, -9, 9) : fallback.gain,
+      q: Number.isFinite(q) ? clamp(q, 0.25, 8) : fallback.q
+    };
+  });
+  if (!bands.length) bands.push({ ...REVERB_DETAIL_DEFAULTS.bands[0] });
+  const selectedBandId = bands.some((band) => band.id === source?.selectedBandId) ? source.selectedBandId : bands[0].id;
+  return { selectedBandId, bands };
+}
+
+function defaultReverbDetail() {
+  return sanitizeReverbDetail(REVERB_DETAIL_DEFAULTS);
+}
+
+function selectedReverbBand(detail = state.reverbDetail) {
+  const sanitized = sanitizeReverbDetail(detail);
+  return sanitized.bands.find((band) => band.id === sanitized.selectedBandId) || sanitized.bands[0];
+}
+
+function updateReverbBand(detail, id, values) {
+  const next = sanitizeReverbDetail(detail);
+  const selectedBandId = next.bands.some((band) => band.id === id) ? id : next.selectedBandId;
+  return sanitizeReverbDetail({
+    selectedBandId,
+    bands: next.bands.map((band) => band.id === selectedBandId ? { ...band, ...values } : band)
+  });
+}
+
+function uniqueReverbBandId(bands) {
+  const existing = new Set(bands.map((band) => band.id));
+  for (let i = 1; i <= MAX_REVERB_BANDS + 1; i++) {
+    const id = `band-${i}`;
+    if (!existing.has(id)) return id;
+  }
+  return `band-${Date.now().toString(36)}`;
+}
+
+function nextReverbBandSeed(index) {
+  return [
+    { freq: 900, gain: -1.2, q: 0.85 },
+    { freq: 1800, gain: 1.6, q: 0.78 },
+    { freq: 3600, gain: 2.2, q: 0.9 },
+    { freq: 7200, gain: 1.4, q: 1.05 }
+  ][index] || { freq: 2400, gain: 1, q: 0.85 };
+}
+
+function reverbEqGeometry(width, height) {
+  const pad = { left: 44, right: 42, top: 18, bottom: 34 };
   return {
-    freq: Number.isFinite(freq) ? clamp(freq, 160, 12000) : REVERB_DETAIL_DEFAULTS.freq,
-    gain: Number.isFinite(gain) ? clamp(gain, -9, 9) : REVERB_DETAIL_DEFAULTS.gain,
-    q: Number.isFinite(q) ? clamp(q, 0.25, 8) : REVERB_DETAIL_DEFAULTS.q
+    width,
+    height,
+    pad,
+    minFreq: 80,
+    maxFreq: 16000,
+    minDb: -12,
+    maxDb: 12,
+    plotWidth: width - pad.left - pad.right,
+    plotHeight: height - pad.top - pad.bottom
   };
+}
+
+function freqToEqX(freq, geometry) {
+  return geometry.pad.left + Math.log(freq / geometry.minFreq) / Math.log(geometry.maxFreq / geometry.minFreq) * geometry.plotWidth;
+}
+
+function dbToEqY(db, geometry) {
+  return geometry.pad.top + (1 - ((db - geometry.minDb) / (geometry.maxDb - geometry.minDb))) * geometry.plotHeight;
+}
+
+function freqFromEqX(x, geometry) {
+  const normalized = clamp((x - geometry.pad.left) / geometry.plotWidth, 0, 1);
+  return geometry.minFreq * Math.pow(geometry.maxFreq / geometry.minFreq, normalized);
+}
+
+function dbFromEqY(y, geometry) {
+  const normalized = clamp((y - geometry.pad.top) / geometry.plotHeight, 0, 1);
+  return geometry.maxDb - normalized * (geometry.maxDb - geometry.minDb);
+}
+
+function nearestReverbBand(detail, x, y, geometry) {
+  return detail.bands.reduce((nearest, band) => {
+    const dx = freqToEqX(band.freq, geometry) - x;
+    const dy = dbToEqY(band.gain, geometry) - y;
+    const distance = Math.hypot(dx, dy);
+    if (!nearest || distance < nearest.distance) return { band, distance };
+    return nearest;
+  }, null);
 }
 
 function freqFromNormalized(value) {
