@@ -115,15 +115,19 @@
         <span id="clipWarning" class="clip-warning hidden" role="status" aria-live="polite">CLIP</span>
       </section>
 
-      <section class="music-card" aria-labelledby="musicTitle">
+      <section id="musicCard" class="music-card" data-bgm="off" aria-label="Output mix">
+        <label class="music-control voice-control" for="voiceVolumeInput">
+          <span>VOICE <em id="voiceVolumeValue">100%</em></span>
+          <input id="voiceVolumeInput" type="range" min="0" max="100" step="1" value="100" />
+        </label>
         <div class="music-head">
-          <strong id="musicTitle">BGM</strong>
+          <strong>BGM</strong>
           <div class="music-connect">
             <span id="musicStatus" class="music-status" data-state="idle" role="status" aria-live="polite">OFF</span>
             <button id="musicSourceBtn" class="ghost music-source-btn" type="button" disabled>音源を選ぶ</button>
           </div>
         </div>
-        <div class="music-controls">
+        <div id="musicControls" class="music-controls hidden">
           <label class="music-control" for="musicDelayInput">
             <span>DELAY <em id="musicDelayValue">100 ms</em></span>
             <input id="musicDelayInput" type="range" min="0" max="500" step="5" value="100" />

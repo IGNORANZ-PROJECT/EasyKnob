@@ -15,6 +15,7 @@ const DEFAULTS = {
   presetDefaultsVersion: PRESET_DEFAULTS_VERSION,
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
+  voiceVolume: 1,
   musicDelayMs: 100,
   musicVolume: 0.7,
   micDeviceId: 'default',
@@ -144,6 +145,7 @@ let musicStream = null;
 let outputDestination = null;
 let mixNode = null;
 let masterLimiterNode = null;
+let voiceGainNode = null;
 let musicSourceNode = null;
 let musicDelayNode = null;
 let musicGainNode = null;
@@ -196,8 +198,12 @@ const reverbFreqInput = $('reverbFreqInput');
 const reverbGainInput = $('reverbGainInput');
 const reverbQInput = $('reverbQInput');
 const quickToneStatuses = document.querySelectorAll('[data-quick-tone-status]');
+const musicCard = $('musicCard');
+const musicControls = $('musicControls');
 const musicSourceBtn = $('musicSourceBtn');
 const musicStatus = $('musicStatus');
+const voiceVolumeInput = $('voiceVolumeInput');
+const voiceVolumeValue = $('voiceVolumeValue');
 const musicDelayInput = $('musicDelayInput');
 const musicDelayValue = $('musicDelayValue');
 const musicVolumeInput = $('musicVolumeInput');
@@ -361,6 +367,12 @@ function bindUi() {
     if (running) await restartAudio();
   });
   presetSelect.addEventListener('change', () => applyPreset(presetSelect.value));
+  voiceVolumeInput?.addEventListener('input', () => {
+    state.voiceVolume = clamp(Number(voiceVolumeInput.value) / 100, 0, 1);
+    updateVoiceAudioParam();
+    renderMusicControls();
+    saveState();
+  });
   musicSourceBtn?.addEventListener('click', async () => {
     if (musicStream) stopMusicSource();
     else await startMusicSource();
@@ -1003,9 +1015,12 @@ async function startAudio() {
     outputDestination = audioContext.createMediaStreamDestination();
     mixNode = audioContext.createGain();
     masterLimiterNode = createMasterLimiter(audioContext);
+    voiceGainNode = audioContext.createGain();
     sourceNode.connect(workletNode);
-    workletNode.connect(mixNode);
+    workletNode.connect(voiceGainNode);
+    voiceGainNode.connect(mixNode);
     mixNode.connect(masterLimiterNode);
+    updateVoiceAudioParam();
     monitor.srcObject = outputDestination.stream;
     monitor.muted = false;
     const outputReady = await applyOutputDevice({ allowFallback: true });
@@ -1116,6 +1131,14 @@ function updateMusicAudioParams() {
   }
 }
 
+function updateVoiceAudioParam() {
+  const volume = clamp(Number(state.voiceVolume), 0, 1);
+  const now = audioContext?.currentTime || 0;
+  if (!voiceGainNode) return;
+  voiceGainNode.gain.cancelScheduledValues(now);
+  voiceGainNode.gain.setTargetAtTime(Number.isFinite(volume) ? volume : DEFAULTS.voiceVolume, now, 0.015);
+}
+
 function createMasterLimiter(context) {
   const limiter = context.createDynamicsCompressor();
   limiter.threshold.value = -3;
@@ -1136,13 +1159,18 @@ function musicSourceLabel(surface) {
 function renderMusicControls() {
   if (!musicSourceBtn) return;
   const captureSupported = Boolean(navigator.mediaDevices?.getDisplayMedia);
+  state.voiceVolume = clamp(Number.isFinite(Number(state.voiceVolume)) ? Number(state.voiceVolume) : DEFAULTS.voiceVolume, 0, 1);
   state.musicDelayMs = clamp(Number(state.musicDelayMs) || 0, 0, 500);
   state.musicVolume = clamp(Number.isFinite(Number(state.musicVolume)) ? Number(state.musicVolume) : DEFAULTS.musicVolume, 0, 1);
+  voiceVolumeInput.value = `${Math.round(state.voiceVolume * 100)}`;
+  voiceVolumeValue.textContent = `${Math.round(state.voiceVolume * 100)}%`;
   musicDelayInput.value = `${state.musicDelayMs}`;
   musicVolumeInput.value = `${Math.round(state.musicVolume * 100)}`;
   musicDelayValue.textContent = `${Math.round(state.musicDelayMs)} ms`;
   musicVolumeValue.textContent = `${Math.round(state.musicVolume * 100)}%`;
   musicSourceBtn.disabled = !running || !captureSupported;
+  musicCard.dataset.bgm = musicStream ? 'on' : 'off';
+  musicControls.classList.toggle('hidden', !musicStream);
   musicSourceBtn.classList.toggle('active', Boolean(musicStream));
   musicSourceBtn.textContent = musicStream ? '解除' : '音源を選ぶ';
   musicStatus.dataset.state = musicStream ? 'live' : (musicErrorMessage ? 'error' : 'idle');
@@ -1338,6 +1366,7 @@ async function stopAudio({ showIdle = true } = {}) {
   try { if (analyserNode) analyserNode.disconnect(); } catch {}
   try { if (mixNode) mixNode.disconnect(); } catch {}
   try { if (masterLimiterNode) masterLimiterNode.disconnect(); } catch {}
+  try { if (voiceGainNode) voiceGainNode.disconnect(); } catch {}
   if (audioContext) await audioContext.close().catch(() => {});
   monitor.pause();
   monitor.srcObject = null;
@@ -1349,6 +1378,7 @@ async function stopAudio({ showIdle = true } = {}) {
   outputDestination = null;
   mixNode = null;
   masterLimiterNode = null;
+  voiceGainNode = null;
   contextSinkActive = false;
   contextSinkPreselected = false;
   contextSinkId = '';

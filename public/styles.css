@@ -52,7 +52,8 @@ button:disabled:hover { border-color: var(--line); transform: none; }
 #meterBar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 999px; transition: width .08s linear; }
 #meterBar.clipping { background: linear-gradient(90deg, var(--danger), var(--accent-2)); }
 .clip-warning { min-height: 42px; min-width: 54px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,95,87,.58); border-radius: 6px; background: rgba(255,95,87,.12); color: #ffc0bc; font-size: 11px; font-weight: 900; letter-spacing: .1em; }
-.music-card { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #0c0e12; display: grid; grid-template-columns: minmax(190px, .48fr) minmax(320px, 1.52fr); gap: 18px; align-items: center; }
+.music-card { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #0c0e12; display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 18px; align-items: center; }
+.music-card[data-bgm="on"] { grid-template-columns: minmax(190px, .62fr) auto minmax(320px, 1.38fr); }
 .music-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-width: 0; }
 .music-head > strong { font-size: 13px; letter-spacing: .1em; }
 .music-connect { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
@@ -68,6 +69,7 @@ button:disabled:hover { border-color: var(--line); transform: none; }
 .music-control span { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 11px; font-weight: 800; }
 .music-control em { color: var(--text); font-style: normal; font-variant-numeric: tabular-nums; }
 .music-control input { width: 100%; accent-color: var(--accent-2); }
+.voice-control input { accent-color: var(--accent); }
 .analyzer-panel { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #0c0d10; margin-bottom: 14px; }
 #analyzerCanvas { display: block; width: 100%; height: 170px; }
 .knob-grid { display: grid; grid-template-columns: repeat(3, minmax(168px, 1fr)); gap: 12px; }
@@ -184,7 +186,7 @@ menu { display: flex; justify-content: flex-end; gap: 10px; padding: 0; margin: 
 @media (max-width: 860px) {
   .topbar { align-items: flex-start; flex-direction: column; }
   .routing-card { grid-template-columns: 1fr; }
-  .music-card { grid-template-columns: 1fr; }
+  .music-card, .music-card[data-bgm="on"] { grid-template-columns: 1fr; }
   .knob-grid { grid-template-columns: 1fr 1fr; }
   .help-step-grid, .help-info-grid, .trouble-grid, .knob-help-list { grid-template-columns: 1fr; }
   #reverbEqCanvas { height: 240px; }
