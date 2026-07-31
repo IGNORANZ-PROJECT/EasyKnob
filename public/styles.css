@@ -114,6 +114,28 @@ h3 { margin: 18px 0 6px; font-size: 16px; }
 .help-card h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: .02em; }
 .help-card h4 { margin: 0 0 6px; color: var(--text); font-size: 13px; letter-spacing: .02em; }
 .help-kicker { margin: 0 0 3px !important; color: var(--accent-2) !important; font-size: 10px; font-weight: 900; letter-spacing: .16em; line-height: 1.2 !important; }
+.virtual-guide { margin-top: 16px; border: 1px solid rgba(255,204,102,.42); border-radius: 8px; background: rgba(255,204,102,.055); padding: 15px; }
+.virtual-guide-head { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+.virtual-guide-head > span { border-radius: 999px; background: var(--accent-2); color: #171006; padding: 5px 8px; font-size: 10px; font-weight: 950; white-space: nowrap; }
+.virtual-guide-head h3 { margin: 0 0 3px; font-size: 15px; }
+.virtual-guide-head p { margin: 0; font-size: 12px; line-height: 1.6; }
+.platform-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 13px 0 10px; }
+.platform-tabs button { min-height: 40px; border: 1px solid var(--line); border-radius: 6px; background: #0c0e12; color: var(--muted); font-size: 12px; font-weight: 900; }
+.platform-tabs button[aria-selected="true"] { border-color: rgba(255,204,102,.7); background: rgba(255,204,102,.1); color: #ffe0a3; }
+.platform-tabs button:hover { border-color: rgba(255,204,102,.55); transform: none; }
+.platform-panel { border: 1px solid rgba(255,255,255,.08); border-radius: 7px; background: #0c0e12; padding: 11px; }
+.install-steps { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0 !important; }
+.install-steps li { display: grid; grid-template-columns: 26px 1fr; gap: 9px; align-items: start; }
+.install-steps b { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(255,204,102,.12); color: var(--accent-2); font-size: 10px; }
+.install-steps span { display: grid; gap: 2px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.install-steps strong { font-size: 12px; }
+.install-steps a { width: fit-content; color: var(--accent); font-weight: 900; text-decoration: none; }
+.install-steps a:hover { text-decoration: underline; }
+.install-steps code { width: fit-content; border-radius: 4px; background: rgba(255,255,255,.07); color: var(--text); padding: 1px 4px; font-size: 11px; }
+.install-complete { margin: 10px 0 0 !important; border-top: 1px solid rgba(255,255,255,.08); padding-top: 9px; color: var(--accent) !important; font-size: 11px; font-weight: 900; text-align: center; }
+.bluetooth-tip { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 10px; border: 1px solid rgba(255,95,87,.28); border-radius: 6px; background: rgba(255,95,87,.055); padding: 9px 10px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.bluetooth-tip strong { color: #ffc0bc; white-space: nowrap; }
+.scenario-heading { margin: 18px 0 8px !important; }
 .help-scenario-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0 12px; }
 .help-scenario-tabs button { min-height: 48px; border: 1px solid var(--line); border-radius: 7px; background: #0c0e12; color: var(--muted); padding: 9px 10px; font-size: 12px; font-weight: 900; }
 .help-scenario-tabs button[aria-selected="true"] { border-color: rgba(84,240,194,.7); background: rgba(84,240,194,.09); color: var(--accent); }
@@ -132,9 +154,6 @@ h3 { margin: 18px 0 6px; font-size: 16px; }
 .scenario-alert { margin: 10px 0 0 !important; color: #ffe0a3 !important; font-size: 12px; text-align: center; }
 .help-basics { margin-top: 14px !important; padding-top: 14px !important; }
 .compact-help-grid { margin-top: 0; }
-.platform-route-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 14px 14px; }
-.platform-route-grid p { margin: 0; }
-.platform-route-grid strong { display: block; color: var(--accent); }
 .details-copy { margin: 0; padding: 12px 14px 14px; }
 .help-hero { border: 1px solid rgba(255,204,102,.46); border-radius: 8px; background: rgba(255,204,102,.08); padding: 13px 14px; }
 .help-hero strong { display: block; color: #ffe0a3; font-size: 14px; }
@@ -231,8 +250,11 @@ menu { display: flex; justify-content: flex-end; gap: 10px; padding: 0; margin: 
   .site-footer { align-items: flex-start; flex-direction: column; }
   .quick-tone-grid { grid-template-columns: 1fr; }
   .help-scenario-tabs { grid-template-columns: 1fr; }
+  .virtual-guide-head { grid-template-columns: 1fr; }
+  .virtual-guide-head > span { width: fit-content; }
+  .bluetooth-tip { grid-template-columns: 1fr; }
   .scenario-title { align-items: flex-start; flex-direction: column; gap: 4px; }
-  .scenario-steps, .platform-route-grid { grid-template-columns: 1fr; }
+  .scenario-steps { grid-template-columns: 1fr; }
   .reverb-band-bar { align-items: stretch; flex-direction: column; }
   .reverb-detail-controls { grid-template-columns: 1fr; }
   #reverbEqCanvas { height: 220px; }

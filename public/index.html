@@ -276,6 +276,40 @@
         <button class="icon-btn" value="close" aria-label="閉じる">×</button>
       </header>
 
+      <section class="virtual-guide" aria-labelledby="virtualGuideTitle">
+        <div class="virtual-guide-head">
+          <span>最初の1回だけ</span>
+          <div>
+            <h3 id="virtualGuideTitle">音の通り道を追加する</h3>
+            <p>EasyKnobの声をVRChatやDiscordへ渡すために使います。物理的なケーブルは必要ありません。</p>
+          </div>
+        </div>
+        <div class="platform-tabs" aria-label="OSを選ぶ">
+          <button type="button" data-help-platform="windows" aria-selected="true">Windows</button>
+          <button type="button" data-help-platform="mac" aria-selected="false">Mac</button>
+        </div>
+        <div class="platform-panel" data-platform-panel="windows">
+          <ol class="install-steps">
+            <li><b>1</b><span><strong>VB-CABLEを入れる</strong><a href="https://vb-audio.com/Cable/index.htm" target="_blank" rel="noreferrer">公式ダウンロードを開く ↗</a></span></li>
+            <li><b>2</b><span><strong>ZIPを展開してインストール</strong><code>VBCABLE_Setup_x64.exe</code>を右クリック → 管理者として実行 → Install Driver → PCを再起動</span></li>
+            <li><b>3</b><span><strong>EasyKnobのOutput</strong><code>CABLE Input</code>を選ぶ</span></li>
+            <li><b>4</b><span><strong>VRChat・Discordのマイク</strong><code>CABLE Output</code>を選ぶ</span></li>
+          </ol>
+          <p class="install-complete">Outputに「CABLE Input」が出たら準備完了</p>
+        </div>
+        <div class="platform-panel hidden" data-platform-panel="mac">
+          <ol class="install-steps">
+            <li><b>1</b><span><strong>BlackHole 2chを入れる</strong><a href="https://existential.audio/blackhole/download/" target="_blank" rel="noreferrer">公式ダウンロードを開く ↗</a></span></li>
+            <li><b>2</b><span><strong>ダウンロードしたパッケージを開く</strong>画面の案内どおりインストールし、Chromeと使用するアプリを開き直す</span></li>
+            <li><b>3</b><span><strong>EasyKnobのOutput</strong><code>BlackHole 2ch</code>を選ぶ</span></li>
+            <li><b>4</b><span><strong>VRChat・Discordのマイク</strong><code>BlackHole 2ch</code>を選ぶ</span></li>
+          </ol>
+          <p class="install-complete">Outputに「BlackHole 2ch」が出たら準備完了</p>
+        </div>
+        <div class="bluetooth-tip"><strong>音楽が急にこもる時</strong>Bluetoothイヤホンは聴くためだけに使い、InputはPC内蔵マイクかUSBマイクを選びます。</div>
+      </section>
+
+      <h3 class="scenario-heading">使い方を選ぶ</h3>
       <nav class="help-scenario-tabs" aria-label="使い方を選ぶ">
         <button type="button" data-help-scenario="vrchat" aria-selected="true">VRChatで歌う</button>
         <button type="button" data-help-scenario="source" aria-selected="false">動画・アプリで歌う</button>
@@ -328,15 +362,8 @@
         </div>
         <div class="setup-accordion">
           <details>
-            <summary>仮想オーディオの接続</summary>
-            <div class="platform-route-grid">
-              <p><strong>Windows</strong>EasyKnob：CABLE Input<br>VRChat・Discord・OBS：CABLE Output</p>
-              <p><strong>Mac</strong>EasyKnob：BlackHole<br>VRChat・Discord・OBS：BlackHole</p>
-            </div>
-          </details>
-          <details>
             <summary>音が出ない時</summary>
-            <p class="details-copy">Chrome / Edgeを使用し、マイク許可、Input、Outputを確認してください。</p>
+            <p class="details-copy">Chrome / Edgeを使い、マイクを許可してください。仮想オーディオがOutputに出ない場合は、インストール後にPCまたはアプリを再起動します。</p>
           </details>
         </div>
       </section>

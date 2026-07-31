@@ -131,10 +131,10 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
   }
   softLimit(x) {
     const ax = Math.abs(x);
-    if (ax <= 0.88) return x;
+    if (ax <= 0.95) return x;
     const sign = x < 0 ? -1 : 1;
-    const knee = 0.88 + Math.tanh((ax - 0.88) * 4.2) * 0.105;
-    return sign * this.clamp(knee, 0, 0.985);
+    const knee = 0.95 + Math.tanh((ax - 0.95) * 5) * 0.045;
+    return sign * this.clamp(knee, 0, 0.995);
   }
   now() { return globalThis.performance && typeof globalThis.performance.now === 'function' ? globalThis.performance.now() : 0; }
   clearEffectState() {
@@ -308,7 +308,8 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
     const toneTilt = (tone - 0.5) * 2;
     const toneCutoff = 0.065 + Math.abs(toneTilt) * 0.055;
     const airCoeff = 1 - Math.exp(-2 * Math.PI * (5200 + air * 2600) / this.sampleRate);
-    const compAmount = stable;
+    // Keep the middle of the knob gentle; the upper range still provides firm control.
+    const compAmount = stable * stable;
     const stableAttack = 1 - Math.exp(-1 / (this.sampleRate * (0.0018 + compAmount * 0.0008)));
     const stableRelease = 1 - Math.exp(-1 / (this.sampleRate * (0.042 + (1 - compAmount) * 0.035)));
     const stableGainAttack = 1 - Math.exp(-1 / (this.sampleRate * (0.0007 + compAmount * 0.0008)));
@@ -382,36 +383,36 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
         const stableHighR = r - this.stableLowR;
         const highLevel = Math.max(Math.abs(stableHighL), Math.abs(stableHighR));
         this.stableHighEnv += (highLevel - this.stableHighEnv) * (highLevel > this.stableHighEnv ? stableHighAttack : stableHighRelease);
-        const highThreshold = 0.074 - compAmount * 0.028;
+        const highThreshold = 0.14 - compAmount * 0.04;
         let highGain = 1;
         if (this.stableHighEnv > highThreshold) {
-          const highRatio = 1.8 + compAmount * 4.2;
+          const highRatio = 1.5 + compAmount * 2.2;
           const highDesired = highThreshold + (this.stableHighEnv - highThreshold) / highRatio;
-          highGain = this.clamp(highDesired / Math.max(0.0001, this.stableHighEnv), 0.46, 1);
+          highGain = this.clamp(highDesired / Math.max(0.0001, this.stableHighEnv), 0.68, 1);
         }
         l = this.stableLowL + stableHighL * highGain;
         r = this.stableLowR + stableHighR * highGain;
 
-        const threshold = 0.18 - compAmount * 0.09;
-        const ratio = 1.6 + compAmount * 5.4;
+        const threshold = 0.32 - compAmount * 0.1;
+        const ratio = 1.4 + compAmount * 2.6;
         let compGain = 1;
         if (this.env > threshold) {
           const over = this.env / Math.max(0.001, threshold);
           const compressed = threshold * Math.pow(over, 1 / ratio);
-          compGain = this.clamp(compressed / Math.max(0.0001, this.env), 0.22, 1);
+          compGain = this.clamp(compressed / Math.max(0.0001, this.env), 0.5, 1);
         }
 
         const stablePeak = Math.max(Math.abs(l), Math.abs(r));
-        const peakThreshold = 0.58 - compAmount * 0.22;
+        const peakThreshold = 0.78 - compAmount * 0.16;
         let peakGain = 1;
         if (stablePeak > peakThreshold) {
-          const peakRatio = 2.2 + compAmount * 7.8;
+          const peakRatio = 2 + compAmount * 4;
           const peakDesired = peakThreshold + (stablePeak - peakThreshold) / peakRatio;
-          peakGain = this.clamp(peakDesired / Math.max(0.0001, stablePeak), 0.16, 1);
+          peakGain = this.clamp(peakDesired / Math.max(0.0001, stablePeak), 0.52, 1);
         }
-        const targetStableGain = this.clamp(Math.min(compGain, peakGain), 0.16, 1);
+        const targetStableGain = this.clamp(Math.min(compGain, peakGain), 0.5, 1);
         this.stableGain += (targetStableGain - this.stableGain) * (targetStableGain < this.stableGain ? stableGainAttack : stableGainRelease);
-        const makeup = 1 + compAmount * 0.1;
+        const makeup = 1 + compAmount * 0.06;
         const stableGain = Math.min(this.stableGain, peakGain) * makeup;
         l *= stableGain;
         r *= stableGain;
@@ -527,11 +528,11 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
       const preGuardPeak = Math.max(Math.abs(l), Math.abs(r));
       clip = Math.max(clip, preGuardPeak);
       this.feedbackRisk = Math.max(preGuardPeak, this.feedbackRisk * 0.9985);
-      const inputDrive = this.clamp((preStablePeak - 0.58) / 0.42, 0, 1);
-      const rawClipDrive = this.clamp((rawPeak - 0.88) / 0.12, 0, 1);
-      const hotDrive = this.clamp((preGuardPeak - 0.76) / 0.36, 0, 1);
-      const clipDrive = this.clamp((preGuardPeak - 0.94) / 0.22, 0, 1);
-      const sustainedDrive = this.clamp((this.feedbackRisk - 0.82) / 0.28, 0, 1);
+      const inputDrive = this.clamp((preStablePeak - 0.88) / 0.24, 0, 1);
+      const rawClipDrive = this.clamp((rawPeak - 0.96) / 0.08, 0, 1);
+      const hotDrive = this.clamp((preGuardPeak - 0.94) / 0.24, 0, 1);
+      const clipDrive = this.clamp((preGuardPeak - 1.02) / 0.18, 0, 1);
+      const sustainedDrive = this.clamp((this.feedbackRisk - 0.98) / 0.22, 0, 1);
       const howlDrive = Math.max(
         inputDrive * (preGuardPeak > 0.24 ? 0.62 : 0.34),
         rawClipDrive * 0.9,
@@ -550,8 +551,8 @@ class EasyKnobProcessor extends AudioWorkletProcessor {
       else if (this.feedbackRisk > 0.9 && preGuardPeak > 0.78) guardTarget = 0.94;
       const guardSpeed = guardTarget < this.feedbackGuardGain ? 0.004 : 0.0008;
       this.feedbackGuardGain += (guardTarget - this.feedbackGuardGain) * guardSpeed;
-      l *= this.feedbackGuardGain * this.howlGuardGain;
-      r *= this.feedbackGuardGain * this.howlGuardGain;
+      // Keep the dry voice stable. The howl guard already reduces effect sends above.
+      // Attenuating the whole signal here made normal singing pump and sound crushed.
       l = this.softLimit(l);
       r = this.softLimit(r);
       outL[i] = l;

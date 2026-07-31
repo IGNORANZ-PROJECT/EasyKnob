@@ -163,6 +163,7 @@ let clipUntil = 0;
 let warningLabel = 'CLIP';
 let supportMessage = '';
 let runtimeMessage = '';
+let inputQualityMessage = '';
 let musicErrorMessage = '';
 let musicSourceSurface = '';
 let availableMicDeviceIds = new Set();
@@ -210,6 +211,8 @@ const musicVolumeInput = $('musicVolumeInput');
 const musicVolumeValue = $('musicVolumeValue');
 const helpScenarioButtons = document.querySelectorAll('[data-help-scenario]');
 const helpScenarioPanels = document.querySelectorAll('[data-help-panel]');
+const helpPlatformButtons = document.querySelectorAll('[data-help-platform]');
+const helpPlatformPanels = document.querySelectorAll('[data-platform-panel]');
 
 init();
 
@@ -224,6 +227,7 @@ async function init() {
   renderAnalyzerVisibility();
   renderMusicControls();
   renderRuntimeStats();
+  selectHelpPlatform(isMacPlatform() ? 'mac' : 'windows');
   await registerServiceWorker();
   showFirstRunNotice();
   await enumerateDevices();
@@ -281,7 +285,7 @@ function checkSupport() {
 }
 
 function renderBanner() {
-  const message = runtimeMessage || supportMessage;
+  const message = runtimeMessage || inputQualityMessage || supportMessage;
   supportBanner.textContent = message;
   supportBanner.dataset.tone = runtimeMessage ? 'error' : 'warn';
   supportBanner.classList.toggle('hidden', !message);
@@ -324,6 +328,9 @@ function bindUi() {
   helpScenarioButtons.forEach((button) => {
     button.addEventListener('click', () => selectHelpScenario(button.dataset.helpScenario));
   });
+  helpPlatformButtons.forEach((button) => {
+    button.addEventListener('click', () => selectHelpPlatform(button.dataset.helpPlatform));
+  });
   document.querySelectorAll('[data-quick-tone]').forEach((button) => {
     button.addEventListener('click', () => applyQuickTone(button.dataset.quickTone));
   });
@@ -354,6 +361,7 @@ function bindUi() {
   micSelect.addEventListener('change', async () => {
     state.micDeviceId = micSelect.value;
     saveState();
+    updateInputQualityWarning();
     if (running) await restartAudio();
   });
   outputSelect.addEventListener('change', async () => {
@@ -405,6 +413,15 @@ function selectHelpScenario(scenario) {
   });
   helpScenarioPanels.forEach((panel) => {
     panel.classList.toggle('hidden', panel.dataset.helpPanel !== scenario);
+  });
+}
+
+function selectHelpPlatform(platform) {
+  helpPlatformButtons.forEach((button) => {
+    button.setAttribute('aria-selected', `${button.dataset.helpPlatform === platform}`);
+  });
+  helpPlatformPanels.forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.platformPanel !== platform);
   });
 }
 
@@ -967,6 +984,15 @@ async function enumerateDevices() {
   availableOutputDeviceIds = new Set(outputs.map(d => d.deviceId).filter(Boolean));
   fillSelect(micSelect, inputs, 'Default Microphone', state.micDeviceId, '前回選択したマイク');
   fillSelect(outputSelect, outputs, 'Default Output', state.outputDeviceId || 'default', '前回選択した出力');
+  updateInputQualityWarning();
+}
+
+function updateInputQualityWarning(label = micSelect.selectedOptions?.[0]?.textContent || '') {
+  const bluetoothMic = /airpods|bluetooth|hands[ -]?free|ag audio|galaxy buds|pixel buds|beats/i.test(label);
+  inputQualityMessage = bluetoothMic
+    ? 'Bluetoothイヤホンのマイクを使うと音楽が通話音質になります。InputはPC内蔵マイクかUSBマイクを選んでください。'
+    : '';
+  renderBanner();
 }
 
 function fillSelect(select, devices, defaultLabel, selectedId, missingLabel) {
@@ -1018,6 +1044,7 @@ async function startAudio() {
       setRunState('starting', 'Defaultで起動中');
     }
     mediaStream = await openMicStream(micDeviceId);
+    updateInputQualityWarning(mediaStream.getAudioTracks()[0]?.label || '');
     await applyLowLatencyTrackConstraints(mediaStream);
     setRunState('starting', '音声準備中');
     await enumerateDevices();
@@ -1113,6 +1140,7 @@ function connectMusicGraph() {
   musicSourceNode.connect(musicDelayNode);
   musicDelayNode.connect(musicGainNode);
   musicGainNode.connect(mixNode);
+  updateMixHeadroom();
 }
 
 function disconnectMusicGraph() {
@@ -1131,7 +1159,15 @@ function stopMusicSource() {
   stream?.getTracks().forEach(track => track.stop());
   musicErrorMessage = '';
   musicSourceSurface = '';
+  updateMixHeadroom();
   renderMusicControls();
+}
+
+function updateMixHeadroom() {
+  if (!mixNode || !audioContext) return;
+  const now = audioContext.currentTime;
+  mixNode.gain.cancelScheduledValues(now);
+  mixNode.gain.setTargetAtTime(musicStream ? 0.8 : 1, now, 0.02);
 }
 
 function updateMusicAudioParams() {
@@ -1155,11 +1191,11 @@ function updateVoiceAudioParam() {
 
 function createMasterLimiter(context) {
   const limiter = context.createDynamicsCompressor();
-  limiter.threshold.value = -3;
+  limiter.threshold.value = -1.5;
   limiter.knee.value = 0;
-  limiter.ratio.value = 20;
-  limiter.attack.value = 0.002;
-  limiter.release.value = 0.08;
+  limiter.ratio.value = 8;
+  limiter.attack.value = 0.001;
+  limiter.release.value = 0.12;
   return limiter;
 }
 
@@ -1870,16 +1906,17 @@ function normalizePreset(key) {
   return PRESETS[key] ? key : DEFAULTS.preset;
 }
 
-function qualitySampleRate(q) {
-  if (q === 'light') return 32000;
-  if (q === 'balanced') return 44100;
+function qualitySampleRate() {
+  // Keep voice and captured music at the standard rate used by Discord/VRChat.
+  // Quality changes effect complexity, not the entire mix sample rate.
   return 48000;
 }
 
 function qualityLatency(q) {
-  if (q === 'light') return 0.008;
-  if (q === 'balanced') return 0.004;
-  return 0.0015;
+  if (q === 'light') return 0.012;
+  if (q === 'balanced') return 0.008;
+  if (q === 'high') return 0.006;
+  return 0.004;
 }
 
 function preferredInputLatency() {
@@ -1888,6 +1925,10 @@ function preferredInputLatency() {
 
 function isWindowsPlatform() {
   return /Windows|Win32|Win64|WOW64/i.test(`${navigator.userAgent} ${navigator.platform || ''}`);
+}
+
+function isMacPlatform() {
+  return /Macintosh|MacIntel|MacPPC|Mac68K/i.test(`${navigator.userAgent} ${navigator.platform || ''}`);
 }
 
 function clamp(v, lo, hi) {

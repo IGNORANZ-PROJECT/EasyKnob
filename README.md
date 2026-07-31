@@ -45,8 +45,26 @@ EasyKnob は、ブラウザで動く声用カラオケエフェクターです�
 
 Safari や一部ブラウザでは、出力先デバイスの選択が使えない場合があります。その場合、Discord や VRChat へ渡す仮想マイク用途では正常に使えない可能性があります。
 
+## 初回だけ必要な準備
+
+仮想オーディオは、EasyKnobの音をVRChat、Discord、OBSへ渡すための「PC内の音のケーブル」です。物理的なケーブルは必要ありません。
+
+### Windows
+
+1. [VB-CABLE公式サイト](https://vb-audio.com/Cable/index.htm)からドライバーをダウンロードします。
+2. ZIPを展開し、`VBCABLE_Setup_x64.exe`を管理者として実行します。
+3. `Install Driver`を押してPCを再起動します。
+4. EasyKnobの`Output`を`CABLE Input`、VRChatやDiscordのマイクを`CABLE Output`にします。
+
+### Mac
+
+1. [BlackHole公式サイト](https://existential.audio/blackhole/download/)から`BlackHole 2ch`をダウンロードします。
+2. パッケージを開いてインストールし、Chromeと使用するアプリを開き直します。
+3. EasyKnobの`Output`とVRChatやDiscordのマイクを`BlackHole 2ch`にします。
+
 ## 低遅延と音質の推奨設定
 
+- BluetoothイヤホンのマイクをInputにすると、OSの通話モードによって再生音まで大きく劣化する場合があります。Bluetoothイヤホンは再生専用にし、InputにはPC内蔵マイクまたはUSBマイクを選んでください。
 - Discord、OBS、VRChat などの入力側で、ノイズ抑制、エコー除去、自動ゲイン調整、音量自動調整を OFF にしてください。
 - Windows のサウンド設定やメーカー製ユーティリティで、音声拡張、空間オーディオ、マイク補正、ノイズ抑制が有効な場合は OFF 推奨です。
 - Windows の「このデバイスを聴く」、Discord のマイクテスト、OBS の音声モニタリングなど、EasyKnob 以外の監視音は OFF 推奨です。二重に聞くと遅延が強く感じられます。
