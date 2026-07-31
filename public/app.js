@@ -15,6 +15,8 @@ const DEFAULTS = {
   presetDefaultsVersion: PRESET_DEFAULTS_VERSION,
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
+  musicDelayMs: 100,
+  musicVolume: 0.7,
   micDeviceId: 'default',
   outputDeviceId: ''
 };
@@ -138,7 +140,12 @@ let sourceNode = null;
 let workletNode = null;
 let analyserNode = null;
 let mediaStream = null;
+let musicStream = null;
 let outputDestination = null;
+let mixNode = null;
+let musicSourceNode = null;
+let musicDelayNode = null;
+let musicGainNode = null;
 let contextSinkActive = false;
 let contextSinkPreselected = false;
 let contextSinkId = '';
@@ -153,6 +160,7 @@ let clipUntil = 0;
 let warningLabel = 'CLIP';
 let supportMessage = '';
 let runtimeMessage = '';
+let musicErrorMessage = '';
 let availableMicDeviceIds = new Set();
 let availableOutputDeviceIds = new Set();
 
@@ -186,6 +194,13 @@ const reverbFreqInput = $('reverbFreqInput');
 const reverbGainInput = $('reverbGainInput');
 const reverbQInput = $('reverbQInput');
 const quickToneStatuses = document.querySelectorAll('[data-quick-tone-status]');
+const musicSourceBtn = $('musicSourceBtn');
+const musicStatus = $('musicStatus');
+const musicHint = $('musicHint');
+const musicDelayInput = $('musicDelayInput');
+const musicDelayValue = $('musicDelayValue');
+const musicVolumeInput = $('musicVolumeInput');
+const musicVolumeValue = $('musicVolumeValue');
 
 init();
 
@@ -198,6 +213,7 @@ async function init() {
   setRunState('idle', 'READY');
   checkSupport();
   renderAnalyzerVisibility();
+  renderMusicControls();
   renderRuntimeStats();
   await registerServiceWorker();
   showFirstRunNotice();
@@ -344,6 +360,22 @@ function bindUi() {
     if (running) await restartAudio();
   });
   presetSelect.addEventListener('change', () => applyPreset(presetSelect.value));
+  musicSourceBtn?.addEventListener('click', async () => {
+    if (musicStream) stopMusicSource();
+    else await startMusicSource();
+  });
+  musicDelayInput?.addEventListener('input', () => {
+    state.musicDelayMs = clamp(Number(musicDelayInput.value), 0, 500);
+    updateMusicAudioParams();
+    renderMusicControls();
+    saveState();
+  });
+  musicVolumeInput?.addEventListener('input', () => {
+    state.musicVolume = clamp(Number(musicVolumeInput.value) / 100, 0, 1);
+    updateMusicAudioParams();
+    renderMusicControls();
+    saveState();
+  });
   window.addEventListener('resize', drawAnalyzerIdle);
 }
 
@@ -966,7 +998,9 @@ async function startAudio() {
     sourceNode = audioContext.createMediaStreamSource(mediaStream);
     workletNode = new AudioWorkletNode(audioContext, 'easyknob-processor', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
     outputDestination = audioContext.createMediaStreamDestination();
+    mixNode = audioContext.createGain();
     sourceNode.connect(workletNode);
+    workletNode.connect(mixNode);
     monitor.srcObject = outputDestination.stream;
     monitor.muted = false;
     const outputReady = await applyOutputDevice({ allowFallback: true });
@@ -979,6 +1013,7 @@ async function startAudio() {
     startBtn.disabled = false;
     startBtn.textContent = 'OFF';
     startBtn.classList.add('active');
+    renderMusicControls();
     setRunState('live', 'LIVE');
     if (!outputReady) {
       showRuntimeError('選択したOutputへ切り替えられなかったため、Default Outputで起動しました。ブラウザの出力先選択を確認してください。');
@@ -991,6 +1026,104 @@ async function startAudio() {
     setRunState('error', 'ERROR');
     showRuntimeError(message);
   }
+}
+
+async function startMusicSource() {
+  if (!running || !audioContext || !mixNode || !navigator.mediaDevices?.getDisplayMedia) return;
+  musicErrorMessage = '';
+  musicSourceBtn.disabled = true;
+  musicStatus.dataset.state = 'starting';
+  musicStatus.textContent = '選択待ち';
+  musicHint.textContent = '再生する動画を選び「音声を共有」をONにしてください。';
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true,
+      systemAudio: 'include',
+      surfaceSwitching: 'include',
+      selfBrowserSurface: 'exclude'
+    });
+    if (!stream.getAudioTracks().length) {
+      stream.getTracks().forEach(track => track.stop());
+      throw new DOMException('共有音声が選択されていません。', 'NotFoundError');
+    }
+    stopMusicSource();
+    musicStream = stream;
+    connectMusicGraph();
+    const capturedStream = stream;
+    stream.getTracks().forEach((track) => {
+      track.addEventListener('ended', () => {
+        if (musicStream === capturedStream) stopMusicSource();
+      }, { once: true });
+    });
+    renderMusicControls();
+  } catch (error) {
+    if (error?.name !== 'NotAllowedError' && error?.name !== 'AbortError') {
+      musicErrorMessage = '音声を共有できませんでした。「音声を共有」をONにして選び直してください。';
+    } else {
+      musicErrorMessage = '';
+    }
+  } finally {
+    renderMusicControls();
+  }
+}
+
+function connectMusicGraph() {
+  if (!musicStream || !audioContext || !mixNode) return;
+  disconnectMusicGraph();
+  musicSourceNode = audioContext.createMediaStreamSource(musicStream);
+  musicDelayNode = audioContext.createDelay(0.5);
+  musicGainNode = audioContext.createGain();
+  updateMusicAudioParams();
+  musicSourceNode.connect(musicDelayNode);
+  musicDelayNode.connect(musicGainNode);
+  musicGainNode.connect(mixNode);
+}
+
+function disconnectMusicGraph() {
+  try { musicSourceNode?.disconnect(); } catch {}
+  try { musicDelayNode?.disconnect(); } catch {}
+  try { musicGainNode?.disconnect(); } catch {}
+  musicSourceNode = null;
+  musicDelayNode = null;
+  musicGainNode = null;
+}
+
+function stopMusicSource() {
+  const stream = musicStream;
+  musicStream = null;
+  disconnectMusicGraph();
+  stream?.getTracks().forEach(track => track.stop());
+  musicErrorMessage = '';
+  renderMusicControls();
+}
+
+function updateMusicAudioParams() {
+  const delay = clamp(Number(state.musicDelayMs) || 0, 0, 500) / 1000;
+  const volume = clamp(Number(state.musicVolume), 0, 1);
+  if (musicDelayNode) musicDelayNode.delayTime.setValueAtTime(delay, audioContext?.currentTime || 0);
+  if (musicGainNode) musicGainNode.gain.setValueAtTime(Number.isFinite(volume) ? volume : DEFAULTS.musicVolume, audioContext?.currentTime || 0);
+}
+
+function renderMusicControls() {
+  if (!musicSourceBtn) return;
+  const captureSupported = Boolean(navigator.mediaDevices?.getDisplayMedia);
+  state.musicDelayMs = clamp(Number(state.musicDelayMs) || 0, 0, 500);
+  state.musicVolume = clamp(Number.isFinite(Number(state.musicVolume)) ? Number(state.musicVolume) : DEFAULTS.musicVolume, 0, 1);
+  musicDelayInput.value = `${state.musicDelayMs}`;
+  musicVolumeInput.value = `${Math.round(state.musicVolume * 100)}`;
+  musicDelayValue.textContent = `${Math.round(state.musicDelayMs)} ms`;
+  musicVolumeValue.textContent = `${Math.round(state.musicVolume * 100)}%`;
+  musicSourceBtn.disabled = !running || !captureSupported;
+  musicSourceBtn.classList.toggle('active', Boolean(musicStream));
+  musicSourceBtn.textContent = musicStream ? '音源を解除' : '音源を追加';
+  musicStatus.dataset.state = musicStream ? 'live' : (musicErrorMessage ? 'error' : 'idle');
+  musicStatus.textContent = musicStream ? '共有中' : (musicErrorMessage ? '音声なし' : '未接続');
+  musicHint.textContent = musicStream
+    ? '音源を声と一緒にOutputへ送っています。'
+    : (musicErrorMessage || (!captureSupported
+      ? 'このブラウザでは画面音声を共有できません。Chrome / Edgeを使用してください。'
+      : (running ? '動画を再生してから音源を追加してください。' : 'EasyKnobをONにすると音源を追加できます。')));
 }
 
 function createAudioContext() {
@@ -1093,9 +1226,9 @@ function startupErrorMessage(error) {
 }
 
 function connectOutputGraph() {
-  if (!audioContext || !workletNode || !outputDestination) return;
+  if (!audioContext || !mixNode || !outputDestination) return;
   const target = useDirectOutputRoute() || contextSinkActive ? audioContext.destination : outputDestination;
-  try { workletNode.disconnect(); } catch {}
+  try { mixNode.disconnect(); } catch {}
   if (analyserNode) {
     try { analyserNode.disconnect(); } catch {}
     analyserNode = null;
@@ -1104,11 +1237,11 @@ function connectOutputGraph() {
     analyserNode = audioContext.createAnalyser();
     analyserNode.fftSize = 1024;
     analyserNode.smoothingTimeConstant = 0.72;
-    workletNode.connect(analyserNode);
+    mixNode.connect(analyserNode);
     analyserNode.connect(target);
     startAnalyzer();
   } else {
-    workletNode.connect(target);
+    mixNode.connect(target);
     stopAnalyzer();
     drawAnalyzerIdle();
   }
@@ -1170,10 +1303,12 @@ async function stopAudio({ showIdle = true } = {}) {
   clipUntil = 0;
   warningLabel = 'CLIP';
   stopAnalyzer();
+  stopMusicSource();
   if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
   try { if (sourceNode) sourceNode.disconnect(); } catch {}
   try { if (workletNode) workletNode.disconnect(); } catch {}
   try { if (analyserNode) analyserNode.disconnect(); } catch {}
+  try { if (mixNode) mixNode.disconnect(); } catch {}
   if (audioContext) await audioContext.close().catch(() => {});
   monitor.pause();
   monitor.srcObject = null;
@@ -1183,6 +1318,7 @@ async function stopAudio({ showIdle = true } = {}) {
   analyserNode = null;
   mediaStream = null;
   outputDestination = null;
+  mixNode = null;
   contextSinkActive = false;
   contextSinkPreselected = false;
   contextSinkId = '';
@@ -1191,6 +1327,7 @@ async function stopAudio({ showIdle = true } = {}) {
     clearRuntimeError();
   }
   renderRuntimeStats();
+  renderMusicControls();
   drawAnalyzerIdle();
 }
 
