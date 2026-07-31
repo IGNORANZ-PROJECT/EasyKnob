@@ -16,7 +16,8 @@ const DEFAULTS = {
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
   voiceVolume: 1,
-  musicDelayMs: 100,
+  musicSyncAuto: true,
+  musicDelayMs: 0,
   musicVolume: 0.7,
   micDeviceId: 'default',
   outputDeviceId: ''
@@ -207,6 +208,7 @@ const voiceVolumeInput = $('voiceVolumeInput');
 const voiceVolumeValue = $('voiceVolumeValue');
 const musicDelayInput = $('musicDelayInput');
 const musicDelayValue = $('musicDelayValue');
+const musicSyncAutoBtn = $('musicSyncAutoBtn');
 const musicVolumeInput = $('musicVolumeInput');
 const musicVolumeValue = $('musicVolumeValue');
 const helpScenarioButtons = document.querySelectorAll('[data-help-scenario]');
@@ -391,12 +393,18 @@ function bindUi() {
     else await startMusicSource();
   });
   musicDelayInput?.addEventListener('input', () => {
-    musicDelayValue.textContent = `${Math.round(clamp(Number(musicDelayInput.value), 0, 500))} ms`;
+    state.musicSyncAuto = false;
+    state.musicDelayMs = clamp(Number(musicDelayInput.value), 0, 500);
+    renderMusicSyncUi();
   });
   musicDelayInput?.addEventListener('change', () => {
     state.musicDelayMs = clamp(Number(musicDelayInput.value), 0, 500);
     updateMusicAudioParams();
     saveState();
+  });
+  musicSyncAutoBtn?.addEventListener('click', () => {
+    state.musicSyncAuto = true;
+    refreshAutoMusicDelay();
   });
   musicVolumeInput?.addEventListener('input', () => {
     state.musicVolume = clamp(Number(musicVolumeInput.value) / 100, 0, 1);
@@ -1141,6 +1149,7 @@ function connectMusicGraph() {
   musicDelayNode.connect(musicGainNode);
   musicGainNode.connect(mixNode);
   updateMixHeadroom();
+  if (state.musicSyncAuto) refreshAutoMusicDelay();
 }
 
 function disconnectMusicGraph() {
@@ -1181,6 +1190,35 @@ function updateMusicAudioParams() {
   }
 }
 
+function reportedTrackLatencyMs(stream) {
+  const latencySeconds = Number(stream?.getAudioTracks?.()[0]?.getSettings?.().latency);
+  return Number.isFinite(latencySeconds) && latencySeconds > 0 ? latencySeconds * 1000 : 0;
+}
+
+function calculateAutoMusicDelayMs(micLatencyMs, musicLatencyMs, workletBufferMs) {
+  const micMs = Number.isFinite(micLatencyMs) ? Math.max(0, micLatencyMs) : 0;
+  const musicMs = Number.isFinite(musicLatencyMs) ? Math.max(0, musicLatencyMs) : 0;
+  const workletMs = Number.isFinite(workletBufferMs) ? Math.max(0, workletBufferMs) : 0;
+  return Math.round(clamp(micMs + workletMs - musicMs, 0, 500) / 5) * 5;
+}
+
+function estimatedAutoMusicDelayMs() {
+  const micLatencyMs = reportedTrackLatencyMs(mediaStream) || preferredInputLatency() * 1000;
+  const musicLatencyMs = reportedTrackLatencyMs(musicStream);
+  const workletBufferMs = Number(latestStats.bufferMs) > 0
+    ? Number(latestStats.bufferMs)
+    : 128 / (audioContext?.sampleRate || 48000) * 1000;
+  return calculateAutoMusicDelayMs(micLatencyMs, musicLatencyMs, workletBufferMs);
+}
+
+function refreshAutoMusicDelay() {
+  if (!state.musicSyncAuto) return;
+  state.musicDelayMs = estimatedAutoMusicDelayMs();
+  updateMusicAudioParams();
+  renderMusicSyncUi();
+  saveState();
+}
+
 function updateVoiceAudioParam() {
   const volume = clamp(Number(state.voiceVolume), 0, 1);
   const now = audioContext?.currentTime || 0;
@@ -1210,13 +1248,13 @@ function renderMusicControls() {
   if (!musicSourceBtn) return;
   const captureSupported = Boolean(navigator.mediaDevices?.getDisplayMedia);
   state.voiceVolume = clamp(Number.isFinite(Number(state.voiceVolume)) ? Number(state.voiceVolume) : DEFAULTS.voiceVolume, 0, 1);
+  state.musicSyncAuto = state.musicSyncAuto !== false;
   state.musicDelayMs = clamp(Number(state.musicDelayMs) || 0, 0, 500);
   state.musicVolume = clamp(Number.isFinite(Number(state.musicVolume)) ? Number(state.musicVolume) : DEFAULTS.musicVolume, 0, 1);
   voiceVolumeInput.value = `${Math.round(state.voiceVolume * 100)}`;
   voiceVolumeValue.textContent = `${Math.round(state.voiceVolume * 100)}%`;
-  musicDelayInput.value = `${state.musicDelayMs}`;
   musicVolumeInput.value = `${Math.round(state.musicVolume * 100)}`;
-  musicDelayValue.textContent = `${Math.round(state.musicDelayMs)} ms`;
+  renderMusicSyncUi();
   musicVolumeValue.textContent = `${Math.round(state.musicVolume * 100)}%`;
   musicSourceBtn.disabled = !running || !captureSupported;
   musicCard.dataset.bgm = musicStream ? 'on' : 'off';
@@ -1229,6 +1267,15 @@ function renderMusicControls() {
     ? musicSourceLabel(musicSourceSurface)
     : (musicErrorMessage ? '音声なし' : (!captureSupported ? '非対応' : (running ? '未接続' : 'OFF')));
   musicStatus.title = musicSourceSurface === 'monitor' ? 'VRChatなどPC全体の音も含まれます' : '';
+}
+
+function renderMusicSyncUi() {
+  if (!musicDelayInput || !musicDelayValue || !musicSyncAutoBtn) return;
+  state.musicDelayMs = clamp(Number(state.musicDelayMs) || 0, 0, 500);
+  musicDelayInput.value = `${state.musicDelayMs}`;
+  musicDelayValue.textContent = `${Math.round(state.musicDelayMs)} ms`;
+  musicSyncAutoBtn.classList.toggle('active', state.musicSyncAuto);
+  musicSyncAutoBtn.setAttribute('aria-pressed', `${state.musicSyncAuto}`);
 }
 
 function createAudioContext() {
@@ -1375,6 +1422,7 @@ async function syncOutputRoute() {
 
 function handleWorkletMessage(data) {
   if (data.type !== 'stats') return;
+  const hadBufferStats = latestStats.bufferMs > 0;
   latestStats = {
     load: Number.isFinite(data.load) ? data.load : latestStats.load,
     peak: Number.isFinite(data.peak) ? data.peak : latestStats.peak,
@@ -1383,6 +1431,7 @@ function handleWorkletMessage(data) {
     guard: Number.isFinite(data.guard) ? data.guard : latestStats.guard
   };
   statsReceived = true;
+  if (!hadBufferStats && state.musicSyncAuto && musicStream) refreshAutoMusicDelay();
   const clipping = latestStats.clip >= 0.96 || latestStats.peak >= 0.98;
   const mixLimiting = Number(masterLimiterNode?.reduction || 0) < -1;
   const howling = latestStats.guard < 0.82;
