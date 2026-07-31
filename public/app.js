@@ -109,7 +109,7 @@ const PRESETS = {
     bypassed: { ...DEFAULTS.bypassed, echo: true, reverb: true, double: true }
   },
   preset1: {
-    label: 'Preset 1',
+    label: 'My 1',
     params: { mic: 0.5, echo: 0.18, reverb: 0.14, room: 0.5, wet: 0.58, tone: 0.54, air: 0.16, stable: 0.42, double: 0.04 },
     reverbDetail: { selectedBandId: 'band-1', bands: [
       { id: 'band-1', freq: 2100, gain: 1.8, q: 0.74 },
@@ -118,13 +118,13 @@ const PRESETS = {
     bypassed: { ...DEFAULTS.bypassed }
   },
   preset2: {
-    label: 'Preset 2',
+    label: 'My 2',
     params: { mic: 0.48, echo: 0.06, reverb: 0.06, room: 0.4, wet: 0.42, tone: 0.62, air: 0.2, stable: 0.58, double: 0 },
     reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1800, gain: 1.0, q: 0.7 }] },
     bypassed: { ...DEFAULTS.bypassed, double: true }
   },
   preset3: {
-    label: 'Preset 3',
+    label: 'My 3',
     params: { mic: 0.5, echo: 0.34, reverb: 0.36, room: 0.8, wet: 0.78, tone: 0.48, air: 0.22, stable: 0.38, double: 0.14 },
     reverbDetail: { selectedBandId: 'band-2', bands: [
       { id: 'band-1', freq: 760, gain: 1.6, q: 0.64 },
@@ -208,6 +208,8 @@ const musicDelayInput = $('musicDelayInput');
 const musicDelayValue = $('musicDelayValue');
 const musicVolumeInput = $('musicVolumeInput');
 const musicVolumeValue = $('musicVolumeValue');
+const helpScenarioButtons = document.querySelectorAll('[data-help-scenario]');
+const helpScenarioPanels = document.querySelectorAll('[data-help-panel]');
 
 init();
 
@@ -319,6 +321,9 @@ function bindUi() {
   $('settingsBtn').addEventListener('click', () => $('settingsDialog').showModal());
   $('helpBtn').addEventListener('click', () => $('helpDialog').showModal());
   $('quickSetupBtn').addEventListener('click', () => $('quickSetupDialog').showModal());
+  helpScenarioButtons.forEach((button) => {
+    button.addEventListener('click', () => selectHelpScenario(button.dataset.helpScenario));
+  });
   document.querySelectorAll('[data-quick-tone]').forEach((button) => {
     button.addEventListener('click', () => applyQuickTone(button.dataset.quickTone));
   });
@@ -392,6 +397,15 @@ function bindUi() {
     saveState();
   });
   window.addEventListener('resize', drawAnalyzerIdle);
+}
+
+function selectHelpScenario(scenario) {
+  helpScenarioButtons.forEach((button) => {
+    button.setAttribute('aria-selected', `${button.dataset.helpScenario === scenario}`);
+  });
+  helpScenarioPanels.forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.helpPanel !== scenario);
+  });
 }
 
 function showFirstRunNotice() {

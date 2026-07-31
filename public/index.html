@@ -61,7 +61,7 @@
         <h1>EasyKnob</h1>
       </div>
       <div class="top-actions">
-        <button id="helpBtn" class="ghost intro-btn" type="button">初めての方へ</button>
+        <button id="helpBtn" class="ghost intro-btn" type="button"><span>?</span>初めての方へ</button>
         <button id="quickSetupBtn" class="ghost quick-setup-btn" type="button">ワンクリックで簡単設定</button>
         <button id="settingsBtn" class="ghost" type="button">設定</button>
       </div>
@@ -91,12 +91,16 @@
         <div class="field compact">
           <label for="presetSelect">Preset</label>
           <select id="presetSelect">
-            <option value="default">Default</option>
-            <option value="singing">Sing</option>
-            <option value="talk">Talk</option>
-            <option value="preset1">Preset 1</option>
-            <option value="preset2">Preset 2</option>
-            <option value="preset3">Preset 3</option>
+            <optgroup label="BASE">
+              <option value="default">Default</option>
+              <option value="singing">Sing</option>
+              <option value="talk">Talk</option>
+            </optgroup>
+            <optgroup label="MY PRESET">
+              <option value="preset1">My 1</option>
+              <option value="preset2">My 2</option>
+              <option value="preset3">My 3</option>
+            </optgroup>
           </select>
         </div>
       </section>
@@ -129,11 +133,11 @@
         </div>
         <div id="musicControls" class="music-controls hidden">
           <label class="music-control" for="musicDelayInput">
-            <span>DELAY <em id="musicDelayValue">100 ms</em></span>
+            <span>SYNC <em id="musicDelayValue">100 ms</em></span>
             <input id="musicDelayInput" type="range" min="0" max="500" step="5" value="100" />
           </label>
           <label class="music-control" for="musicVolumeInput">
-            <span>VOL <em id="musicVolumeValue">70%</em></span>
+            <span>BGM <em id="musicVolumeValue">70%</em></span>
             <input id="musicVolumeInput" type="range" min="0" max="100" step="1" value="70" />
           </label>
         </div>
@@ -265,144 +269,76 @@
   <dialog id="helpDialog" class="modal">
     <form method="dialog" class="modal-card help-card">
       <header>
-        <h2>初めての方へ</h2>
+        <div>
+          <p class="help-kicker">HOW TO USE</p>
+          <h2>初めての方へ</h2>
+        </div>
         <button class="icon-btn" value="close" aria-label="閉じる">×</button>
       </header>
 
-      <section class="help-section help-start">
-        <h3>まず最初に</h3>
-        <div class="help-hero">
-          <strong>初回のマイク許可は、ONを押した後に表示されます。</strong>
-          <p>Input、Output、Presetを選んでONを押してください。初回だけブラウザがマイク使用を確認します。許可すると状態がSTARTINGからLIVEに変わり、EasyKnobが動き始めます。</p>
-        </div>
-        <div class="help-step-grid" aria-label="EasyKnob quick start">
-          <article>
-            <b>1</b>
-            <strong>Chrome / Edgeで開く</strong>
-            <span>Output選択を使うため、デスクトップ版ChromeまたはEdgeがおすすめです。</span>
-          </article>
-          <article>
-            <b>2</b>
-            <strong>InputとOutputを選ぶ</strong>
-            <span>Inputは使うマイク、OutputはCABLE InputやBlackHoleなどを選びます。</span>
-          </article>
-          <article>
-            <b>3</b>
-            <strong>ONを押して許可</strong>
-            <span>初回はここでマイク許可が出ます。許可しないと音声処理は開始されません。</span>
-          </article>
-        </div>
+      <nav class="help-scenario-tabs" aria-label="使い方を選ぶ">
+        <button type="button" data-help-scenario="vrchat" aria-selected="true">VRChatで歌う</button>
+        <button type="button" data-help-scenario="source" aria-selected="false">動画・アプリで歌う</button>
+        <button type="button" data-help-scenario="call" aria-selected="false">通話で使う</button>
+      </nav>
+
+      <section class="help-scenario-panel" data-help-panel="vrchat">
+        <div class="scenario-title"><span>VRCHAT</span><strong>BGMは使いません</strong></div>
+        <ol class="scenario-steps">
+          <li><b>1</b><span><strong>Outputを選ぶ</strong>CABLE InputまたはBlackHole</span></li>
+          <li><b>2</b><span><strong>ONにする</strong>初回だけマイクを許可</span></li>
+          <li><b>3</b><span><strong>VRChatへ接続</strong>入力をCABLE OutputまたはBlackHoleに設定</span></li>
+          <li><b>4</b><span><strong>ワールドで同期</strong>カラオケ音源の遅延はワールド側で調整</span></li>
+        </ol>
+        <div class="scenario-route"><span>ワールド音源</span><i>→</i><span>そのまま聴く</span><em>+</em><span>EasyKnobの声</span></div>
       </section>
 
-      <section class="help-section">
-        <h3>Windows / Mac の接続</h3>
-        <p>Discord、VRChat、OBSなどへ加工後の声を渡すには、仮想オーディオデバイスを使います。</p>
+      <section class="help-scenario-panel hidden" data-help-panel="source">
+        <div class="scenario-title"><span>PC AUDIO</span><strong>自分は遅延なしで聴きます</strong></div>
+        <ol class="scenario-steps">
+          <li><b>1</b><span><strong>音源を再生</strong>イヤホンで動画・アプリをそのまま聴く</span></li>
+          <li><b>2</b><span><strong>EasyKnobをON</strong>BGMの「音源を選ぶ」から音声を共有</span></li>
+          <li><b>3</b><span><strong>出力を合わせる</strong>SYNCで声とBGM、VOICEとBGMで音量を調整</span></li>
+          <li><b>4</b><span><strong>配信へ出す</strong>スピーカーまたは仮想ケーブルへまとめて出力</span></li>
+        </ol>
+        <div class="scenario-route"><span>元音源</span><i>→</i><span>イヤホン</span><em>／</em><span>声+BGM</span><i>→</i><span>配信</span></div>
+        <p class="scenario-alert">元音源とEasyKnobのOutputを同じ機器で聴くと二重に聞こえます。</p>
+      </section>
+
+      <section class="help-scenario-panel hidden" data-help-panel="call">
+        <div class="scenario-title"><span>VOICE CHAT</span><strong>声だけを送ります</strong></div>
+        <ol class="scenario-steps">
+          <li><b>1</b><span><strong>Outputを選ぶ</strong>CABLE InputまたはBlackHole</span></li>
+          <li><b>2</b><span><strong>ワンクリック設定</strong>「普通に話したい」などを選ぶ</span></li>
+          <li><b>3</b><span><strong>ONにする</strong>BGMはOFFのまま使用</span></li>
+          <li><b>4</b><span><strong>通話アプリへ接続</strong>入力を仮想オーディオに設定</span></li>
+        </ol>
+      </section>
+
+      <section class="help-section help-basics">
+        <div class="help-info-grid compact-help-grid">
+          <article>
+            <h4>ワンクリック設定</h4>
+            <p>用途を選ぶだけで音を作ります。</p>
+          </article>
+          <article>
+            <h4>MY PRESET</h4>
+            <p>自分用の3枠。選択中の設定は自動保存されます。</p>
+          </article>
+        </div>
         <div class="setup-accordion">
-          <details open>
-            <summary>Windowsの方</summary>
-            <ol>
-              <li>ChromeまたはEdgeでEasyKnobを開きます。Safariや一部ブラウザではOutput選択が使えません。</li>
-              <li>VB-CABLEの公式サイトからWindows用のZIPをダウンロードします。</li>
-              <li>ZIPを右クリックして展開します。展開せずにZIP内から実行すると失敗する場合があります。</li>
-              <li>展開したフォルダ内の <strong>VBCABLE_Setup_x64.exe</strong>、環境によっては <strong>VBCABLE_Setup.exe</strong> を右クリックし、管理者として実行します。</li>
-              <li>Install Driverを押し、完了したらWindowsを再起動します。</li>
-              <li>EasyKnobのOutputを <strong>CABLE Input</strong> にします。</li>
-              <li>Discord、VRChat、OBSなどの入力デバイスを <strong>CABLE Output</strong> にします。</li>
-              <li>EasyKnobのONを押します。初回はここでブラウザのマイク許可が出るので、許可してください。</li>
-              <li>外部アプリ側のノイズ抑制、エコー除去、自動ゲイン調整はOFF推奨です。</li>
-            </ol>
+          <details>
+            <summary>仮想オーディオの接続</summary>
+            <div class="platform-route-grid">
+              <p><strong>Windows</strong>EasyKnob：CABLE Input<br>VRChat・Discord・OBS：CABLE Output</p>
+              <p><strong>Mac</strong>EasyKnob：BlackHole<br>VRChat・Discord・OBS：BlackHole</p>
+            </div>
           </details>
           <details>
-            <summary>Macの方</summary>
-            <ol>
-              <li>ChromeまたはEdgeでEasyKnobを開きます。SafariではOutput選択が使えない場合があります。</li>
-              <li>BlackHoleの公式配布元から2ch版をインストールします。</li>
-              <li>インストール後、必要に応じてMacを再起動します。</li>
-              <li>Audio MIDI設定を開き、BlackHoleが表示されていることを確認します。</li>
-              <li>EasyKnobのOutputを <strong>BlackHole</strong> にします。</li>
-              <li>Discord、VRChat、OBSなどの入力デバイスを <strong>BlackHole</strong> にします。</li>
-              <li>EasyKnobのONを押します。初回はここでブラウザのマイク許可が出るので、許可してください。</li>
-              <li>外部アプリ側のノイズ抑制、エコー除去、自動ゲイン調整はOFF推奨です。</li>
-            </ol>
+            <summary>音が出ない時</summary>
+            <p class="details-copy">Chrome / Edgeを使用し、マイク許可、Input、Outputを確認してください。</p>
           </details>
         </div>
-      </section>
-
-      <section class="help-section help-quick">
-        <h3>触らずに音を作る</h3>
-        <p>よく使う音はボタンだけで反映できます。音を出した後に、必要なところだけノブで微調整してください。</p>
-        <div class="quick-tone-grid">
-          <button type="button" data-quick-tone="catchphrase"><strong>決め台詞を決めたい</strong><span>前に出る声と、分かりやすく返るエコー。</span></button>
-          <button type="button" data-quick-tone="godVoice"><strong>神っぽく話したい</strong><span>広い空間、深めの響き、ゆっくり残る演出。</span></button>
-          <button type="button" data-quick-tone="normalTalk"><strong>普通に話したい</strong><span>遅延とクセを抑えた、聞き取りやすい会話。</span></button>
-          <button type="button" data-quick-tone="singingVoice"><strong>歌いたい</strong><span>歌用の広がり、抜け、軽い厚み。</span></button>
-          <button type="button" data-quick-tone="radioVoice"><strong>ラジオっぽく話したい</strong><span>近く、安定した、余計な響きの少ない声。</span></button>
-        </div>
-        <p class="quick-tone-status" data-quick-tone-status aria-live="polite"></p>
-      </section>
-
-      <section class="help-section">
-        <h3>画面の見方</h3>
-        <div class="help-info-grid">
-          <article>
-            <h4>基本操作</h4>
-            <p>Input、Output、Presetを選んでONを押します。LIVEと表示されたら動作中です。RESETはプリセットを変えずに、現在のパラメーターだけ戻します。</p>
-          </article>
-          <article>
-            <h4>プリセット</h4>
-            <p>Default、Sing、Talk、Preset 1から3を選べます。変更したノブ値、ON/OFF、REVERB詳細はブラウザに自動保存されます。</p>
-          </article>
-          <article>
-            <h4>REVERB 詳細</h4>
-            <p>REVERBの詳細ボタンから、Hzグラフ上のポイントを追加、削除、ドラッグできます。選択中のポイントはFREQ、GAIN、Qで細かく調整できます。</p>
-          </article>
-          <article>
-            <h4>ノブのON/OFF</h4>
-            <p>各ノブ右上のON/OFF表示を押すと、そのノブだけ一時的に無効化できます。設定画面で無効化したノブは非表示になり、処理からも外れます。</p>
-          </article>
-        </div>
-        <div class="knob-help-list" aria-label="Knob descriptions">
-          <span><strong>MIC</strong>入力音量。0でEasyKnobから出る声も0。</span>
-          <span><strong>ECHO</strong>後ろで小さく返る遅れ音。</span>
-          <span><strong>REVERB</strong>声の後ろに響きを足す。</span>
-          <span><strong>ROOM</strong>空間の広さと左右の広がり。</span>
-          <span><strong>WET</strong>エフェクト音の混ざり具合。</span>
-          <span><strong>TONE</strong>声の明るさ。</span>
-          <span><strong>AIR</strong>高域の抜けと空気感。</span>
-          <span><strong>STABLE</strong>音量差や刺さる部分を抑える。</span>
-          <span><strong>DOUBLE</strong>声を少し重ねて厚みを足す。</span>
-        </div>
-        <p class="help-note">さらに詳しいKnob(ノブ)の説明は、設定画面の各項目にも記載しています。</p>
-      </section>
-
-      <section class="help-section">
-        <h3>困った時</h3>
-        <div class="trouble-grid">
-          <article>
-            <h4>音が出ない</h4>
-            <p>初回はONを押した後にマイク許可が出ます。ブロックした場合は、ブラウザのサイト設定からEasyKnobのマイクを許可してください。</p>
-            <p>WindowsはEasyKnobのOutputをCABLE Input、外部アプリの入力をCABLE Outputにします。MacはEasyKnob側も外部アプリ側もBlackHoleが基本です。</p>
-          </article>
-          <article>
-            <h4>遅延・音質</h4>
-            <p>DiscordやOBS側のノイズ抑制、エコー除去、自動ゲイン調整はOFF推奨です。Windowsの音声拡張、空間オーディオ、メーカー製マイク補正もOFFにしてください。</p>
-            <p>Windowsの「このデバイスを聴く」、Discordのマイクテスト、OBSの音声モニタリングなど、別経路の監視音もOFF推奨です。</p>
-          </article>
-          <article>
-            <h4>ハウリング</h4>
-            <p>スピーカーから出した音をマイクが拾うとハウリングします。基本はヘッドホンか仮想オーディオ出力を使ってください。</p>
-            <p>HOWLが出る時は、MIC、WET、ECHO、REVERB、DOUBLEを下げ、Outputをスピーカー以外にしてください。</p>
-          </article>
-          <article>
-            <h4>重い・不安定</h4>
-            <p>不要なSTABLE、ECHO、REVERB、ROOM、WET、AIR、DOUBLEをOFFまたは低めにしてください。AUDIO ANALYZERも不要な時はOFF推奨です。</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="warning-box">
-        <h3>対応外環境について</h3>
-        <p>Safariや一部ブラウザでは、出力先デバイスの選択が使えない場合があります。対応外環境では、EasyKnobを仮想マイク用途に使えない可能性があります。</p>
       </section>
 
       <menu>
