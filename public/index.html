@@ -116,24 +116,20 @@
       </section>
 
       <section class="music-card" aria-labelledby="musicTitle">
-        <div class="music-summary">
-          <div>
-            <span class="music-kicker">KARAOKE SOURCE</span>
-            <strong id="musicTitle">動画の音を合わせる</strong>
-            <p id="musicHint">動画やブラウザの音を、声に合わせて遅らせます。</p>
-          </div>
+        <div class="music-head">
+          <strong id="musicTitle">BGM</strong>
           <div class="music-connect">
-            <span id="musicStatus" class="music-status" data-state="idle" role="status" aria-live="polite">未接続</span>
-            <button id="musicSourceBtn" class="ghost music-source-btn" type="button" disabled>音源を追加</button>
+            <span id="musicStatus" class="music-status" data-state="idle" role="status" aria-live="polite">OFF</span>
+            <button id="musicSourceBtn" class="ghost music-source-btn" type="button" disabled>音源を選ぶ</button>
           </div>
         </div>
         <div class="music-controls">
           <label class="music-control" for="musicDelayInput">
-            <span>遅延 <em id="musicDelayValue">100 ms</em></span>
+            <span>DELAY <em id="musicDelayValue">100 ms</em></span>
             <input id="musicDelayInput" type="range" min="0" max="500" step="5" value="100" />
           </label>
           <label class="music-control" for="musicVolumeInput">
-            <span>音量 <em id="musicVolumeValue">70%</em></span>
+            <span>VOL <em id="musicVolumeValue">70%</em></span>
             <input id="musicVolumeInput" type="range" min="0" max="100" step="1" value="70" />
           </label>
         </div>
@@ -292,17 +288,6 @@
             <span>初回はここでマイク許可が出ます。許可しないと音声処理は開始されません。</span>
           </article>
         </div>
-      </section>
-
-      <section class="help-section">
-        <h3>動画の音を声に合わせる</h3>
-        <p>VRChatと同じPCで動画やカラオケ音源を再生する時は、EasyKnobをONにした後で「音源を追加」を押します。</p>
-        <ol>
-          <li>共有画面で、再生する動画のタブ・ウィンドウ・画面を選びます。</li>
-          <li><strong>音声を共有</strong>を必ずONにして共有します。</li>
-          <li>声が伴奏より遅く聞こえる分だけ「遅延」を上げ、最後に「音量」を調整します。</li>
-        </ol>
-        <p class="help-note">EasyKnob自身のタブは選ばないでください。ハウリングを避けるため、ヘッドホンと仮想オーディオ出力の使用を推奨します。画面音声の共有範囲はOSとブラウザにより異なります。</p>
       </section>
 
       <section class="help-section">

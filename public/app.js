@@ -143,6 +143,7 @@ let mediaStream = null;
 let musicStream = null;
 let outputDestination = null;
 let mixNode = null;
+let masterLimiterNode = null;
 let musicSourceNode = null;
 let musicDelayNode = null;
 let musicGainNode = null;
@@ -161,6 +162,7 @@ let warningLabel = 'CLIP';
 let supportMessage = '';
 let runtimeMessage = '';
 let musicErrorMessage = '';
+let musicSourceSurface = '';
 let availableMicDeviceIds = new Set();
 let availableOutputDeviceIds = new Set();
 
@@ -196,7 +198,6 @@ const reverbQInput = $('reverbQInput');
 const quickToneStatuses = document.querySelectorAll('[data-quick-tone-status]');
 const musicSourceBtn = $('musicSourceBtn');
 const musicStatus = $('musicStatus');
-const musicHint = $('musicHint');
 const musicDelayInput = $('musicDelayInput');
 const musicDelayValue = $('musicDelayValue');
 const musicVolumeInput = $('musicVolumeInput');
@@ -365,9 +366,11 @@ function bindUi() {
     else await startMusicSource();
   });
   musicDelayInput?.addEventListener('input', () => {
+    musicDelayValue.textContent = `${Math.round(clamp(Number(musicDelayInput.value), 0, 500))} ms`;
+  });
+  musicDelayInput?.addEventListener('change', () => {
     state.musicDelayMs = clamp(Number(musicDelayInput.value), 0, 500);
     updateMusicAudioParams();
-    renderMusicControls();
     saveState();
   });
   musicVolumeInput?.addEventListener('input', () => {
@@ -999,8 +1002,10 @@ async function startAudio() {
     workletNode = new AudioWorkletNode(audioContext, 'easyknob-processor', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
     outputDestination = audioContext.createMediaStreamDestination();
     mixNode = audioContext.createGain();
+    masterLimiterNode = createMasterLimiter(audioContext);
     sourceNode.connect(workletNode);
     workletNode.connect(mixNode);
+    mixNode.connect(masterLimiterNode);
     monitor.srcObject = outputDestination.stream;
     monitor.muted = false;
     const outputReady = await applyOutputDevice({ allowFallback: true });
@@ -1033,13 +1038,13 @@ async function startMusicSource() {
   musicErrorMessage = '';
   musicSourceBtn.disabled = true;
   musicStatus.dataset.state = 'starting';
-  musicStatus.textContent = '選択待ち';
-  musicHint.textContent = '再生する動画を選び「音声を共有」をONにしてください。';
+  musicStatus.textContent = '選択中';
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
       audio: true,
       systemAudio: 'include',
+      windowAudio: 'window',
       surfaceSwitching: 'include',
       selfBrowserSurface: 'exclude'
     });
@@ -1049,6 +1054,7 @@ async function startMusicSource() {
     }
     stopMusicSource();
     musicStream = stream;
+    musicSourceSurface = stream.getVideoTracks()[0]?.getSettings?.().displaySurface || '';
     connectMusicGraph();
     const capturedStream = stream;
     stream.getTracks().forEach((track) => {
@@ -1095,14 +1101,36 @@ function stopMusicSource() {
   disconnectMusicGraph();
   stream?.getTracks().forEach(track => track.stop());
   musicErrorMessage = '';
+  musicSourceSurface = '';
   renderMusicControls();
 }
 
 function updateMusicAudioParams() {
   const delay = clamp(Number(state.musicDelayMs) || 0, 0, 500) / 1000;
   const volume = clamp(Number(state.musicVolume), 0, 1);
-  if (musicDelayNode) musicDelayNode.delayTime.setValueAtTime(delay, audioContext?.currentTime || 0);
-  if (musicGainNode) musicGainNode.gain.setValueAtTime(Number.isFinite(volume) ? volume : DEFAULTS.musicVolume, audioContext?.currentTime || 0);
+  const now = audioContext?.currentTime || 0;
+  if (musicDelayNode) musicDelayNode.delayTime.setValueAtTime(delay, now);
+  if (musicGainNode) {
+    musicGainNode.gain.cancelScheduledValues(now);
+    musicGainNode.gain.setTargetAtTime(Number.isFinite(volume) ? volume : DEFAULTS.musicVolume, now, 0.015);
+  }
+}
+
+function createMasterLimiter(context) {
+  const limiter = context.createDynamicsCompressor();
+  limiter.threshold.value = -3;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.002;
+  limiter.release.value = 0.08;
+  return limiter;
+}
+
+function musicSourceLabel(surface) {
+  if (surface === 'browser') return 'WEB';
+  if (surface === 'window') return 'APP';
+  if (surface === 'monitor') return 'PC全体';
+  return '接続中';
 }
 
 function renderMusicControls() {
@@ -1116,14 +1144,13 @@ function renderMusicControls() {
   musicVolumeValue.textContent = `${Math.round(state.musicVolume * 100)}%`;
   musicSourceBtn.disabled = !running || !captureSupported;
   musicSourceBtn.classList.toggle('active', Boolean(musicStream));
-  musicSourceBtn.textContent = musicStream ? '音源を解除' : '音源を追加';
+  musicSourceBtn.textContent = musicStream ? '解除' : '音源を選ぶ';
   musicStatus.dataset.state = musicStream ? 'live' : (musicErrorMessage ? 'error' : 'idle');
-  musicStatus.textContent = musicStream ? '共有中' : (musicErrorMessage ? '音声なし' : '未接続');
-  musicHint.textContent = musicStream
-    ? '音源を声と一緒にOutputへ送っています。'
-    : (musicErrorMessage || (!captureSupported
-      ? 'このブラウザでは画面音声を共有できません。Chrome / Edgeを使用してください。'
-      : (running ? '動画を再生してから音源を追加してください。' : 'EasyKnobをONにすると音源を追加できます。')));
+  musicStatus.dataset.source = musicStream ? musicSourceSurface : '';
+  musicStatus.textContent = musicStream
+    ? musicSourceLabel(musicSourceSurface)
+    : (musicErrorMessage ? '音声なし' : (!captureSupported ? '非対応' : (running ? '未接続' : 'OFF')));
+  musicStatus.title = musicSourceSurface === 'monitor' ? 'VRChatなどPC全体の音も含まれます' : '';
 }
 
 function createAudioContext() {
@@ -1226,9 +1253,9 @@ function startupErrorMessage(error) {
 }
 
 function connectOutputGraph() {
-  if (!audioContext || !mixNode || !outputDestination) return;
+  if (!audioContext || !masterLimiterNode || !outputDestination) return;
   const target = useDirectOutputRoute() || contextSinkActive ? audioContext.destination : outputDestination;
-  try { mixNode.disconnect(); } catch {}
+  try { masterLimiterNode.disconnect(); } catch {}
   if (analyserNode) {
     try { analyserNode.disconnect(); } catch {}
     analyserNode = null;
@@ -1237,11 +1264,11 @@ function connectOutputGraph() {
     analyserNode = audioContext.createAnalyser();
     analyserNode.fftSize = 1024;
     analyserNode.smoothingTimeConstant = 0.72;
-    mixNode.connect(analyserNode);
+    masterLimiterNode.connect(analyserNode);
     analyserNode.connect(target);
     startAnalyzer();
   } else {
-    mixNode.connect(target);
+    masterLimiterNode.connect(target);
     stopAnalyzer();
     drawAnalyzerIdle();
   }
@@ -1279,11 +1306,12 @@ function handleWorkletMessage(data) {
   };
   statsReceived = true;
   const clipping = latestStats.clip >= 0.96 || latestStats.peak >= 0.98;
+  const mixLimiting = Number(masterLimiterNode?.reduction || 0) < -1;
   const howling = latestStats.guard < 0.82;
   if (howling) {
     warningLabel = 'HOWL';
     clipUntil = performance.now() + 900;
-  } else if (clipping) {
+  } else if (clipping || mixLimiting) {
     warningLabel = 'CLIP';
     clipUntil = performance.now() + 900;
   }
@@ -1309,6 +1337,7 @@ async function stopAudio({ showIdle = true } = {}) {
   try { if (workletNode) workletNode.disconnect(); } catch {}
   try { if (analyserNode) analyserNode.disconnect(); } catch {}
   try { if (mixNode) mixNode.disconnect(); } catch {}
+  try { if (masterLimiterNode) masterLimiterNode.disconnect(); } catch {}
   if (audioContext) await audioContext.close().catch(() => {});
   monitor.pause();
   monitor.srcObject = null;
@@ -1319,6 +1348,7 @@ async function stopAudio({ showIdle = true } = {}) {
   mediaStream = null;
   outputDestination = null;
   mixNode = null;
+  masterLimiterNode = null;
   contextSinkActive = false;
   contextSinkPreselected = false;
   contextSinkId = '';
