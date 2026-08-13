@@ -16,7 +16,7 @@ const DEFAULTS = {
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
   voiceVolume: 1,
-  musicDelayMs: 0,
+  musicDelayMs: 100,
   musicVolume: 0.7,
   micDeviceId: 'default',
   outputDeviceId: ''
@@ -149,7 +149,6 @@ let voiceGainNode = null;
 let musicSourceNode = null;
 let musicDelayNode = null;
 let musicGainNode = null;
-let musicDelayManuallyAdjusted = false;
 let contextSinkActive = false;
 let contextSinkPreselected = false;
 let contextSinkId = '';
@@ -392,7 +391,6 @@ function bindUi() {
     else await startMusicSource();
   });
   musicDelayInput?.addEventListener('input', () => {
-    musicDelayManuallyAdjusted = true;
     state.musicDelayMs = clamp(Number(musicDelayInput.value), 0, 500);
     updateMusicAudioParams();
     renderMusicSyncUi();
@@ -1145,8 +1143,10 @@ function connectMusicGraph() {
   musicDelayNode.connect(musicGainNode);
   musicGainNode.connect(mixNode);
   updateMixHeadroom();
-  musicDelayManuallyAdjusted = false;
-  refreshInitialMusicDelay();
+  state.musicDelayMs = DEFAULTS.musicDelayMs;
+  updateMusicAudioParams();
+  renderMusicSyncUi();
+  saveState();
 }
 
 function disconnectMusicGraph() {
@@ -1185,35 +1185,6 @@ function updateMusicAudioParams() {
     musicGainNode.gain.cancelScheduledValues(now);
     musicGainNode.gain.setTargetAtTime(Number.isFinite(volume) ? volume : DEFAULTS.musicVolume, now, 0.015);
   }
-}
-
-function reportedTrackLatencyMs(stream) {
-  const latencySeconds = Number(stream?.getAudioTracks?.()[0]?.getSettings?.().latency);
-  return Number.isFinite(latencySeconds) && latencySeconds > 0 ? latencySeconds * 1000 : 0;
-}
-
-function calculateAutoMusicDelayMs(micLatencyMs, musicLatencyMs, workletBufferMs) {
-  const micMs = Number.isFinite(micLatencyMs) ? Math.max(0, micLatencyMs) : 0;
-  const musicMs = Number.isFinite(musicLatencyMs) ? Math.max(0, musicLatencyMs) : 0;
-  const workletMs = Number.isFinite(workletBufferMs) ? Math.max(0, workletBufferMs) : 0;
-  return Math.round(clamp(micMs + workletMs - musicMs, 0, 500) / 5) * 5;
-}
-
-function estimatedAutoMusicDelayMs() {
-  const micLatencyMs = reportedTrackLatencyMs(mediaStream) || preferredInputLatency() * 1000;
-  const musicLatencyMs = reportedTrackLatencyMs(musicStream);
-  const workletBufferMs = Number(latestStats.bufferMs) > 0
-    ? Number(latestStats.bufferMs)
-    : 128 / (audioContext?.sampleRate || 48000) * 1000;
-  return calculateAutoMusicDelayMs(micLatencyMs, musicLatencyMs, workletBufferMs);
-}
-
-function refreshInitialMusicDelay() {
-  if (musicDelayManuallyAdjusted) return;
-  state.musicDelayMs = estimatedAutoMusicDelayMs();
-  updateMusicAudioParams();
-  renderMusicSyncUi();
-  saveState();
 }
 
 function updateVoiceAudioParam() {
@@ -1416,7 +1387,6 @@ async function syncOutputRoute() {
 
 function handleWorkletMessage(data) {
   if (data.type !== 'stats') return;
-  const hadBufferStats = latestStats.bufferMs > 0;
   latestStats = {
     load: Number.isFinite(data.load) ? data.load : latestStats.load,
     peak: Number.isFinite(data.peak) ? data.peak : latestStats.peak,
@@ -1425,7 +1395,6 @@ function handleWorkletMessage(data) {
     guard: Number.isFinite(data.guard) ? data.guard : latestStats.guard
   };
   statsReceived = true;
-  if (!hadBufferStats && !musicDelayManuallyAdjusted && musicStream) refreshInitialMusicDelay();
   const clipping = latestStats.clip >= 0.96 || latestStats.peak >= 0.98;
   const mixLimiting = Number(masterLimiterNode?.reduction || 0) < -1;
   const howling = latestStats.guard < 0.82;
