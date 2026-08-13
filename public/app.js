@@ -16,7 +16,6 @@ const DEFAULTS = {
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
   voiceVolume: 1,
-  musicSyncAuto: true,
   musicDelayMs: 0,
   musicVolume: 0.7,
   micDeviceId: 'default',
@@ -150,6 +149,7 @@ let voiceGainNode = null;
 let musicSourceNode = null;
 let musicDelayNode = null;
 let musicGainNode = null;
+let musicDelayManuallyAdjusted = false;
 let contextSinkActive = false;
 let contextSinkPreselected = false;
 let contextSinkId = '';
@@ -208,7 +208,6 @@ const voiceVolumeInput = $('voiceVolumeInput');
 const voiceVolumeValue = $('voiceVolumeValue');
 const musicDelayInput = $('musicDelayInput');
 const musicDelayValue = $('musicDelayValue');
-const musicSyncAutoBtn = $('musicSyncAutoBtn');
 const musicVolumeInput = $('musicVolumeInput');
 const musicVolumeValue = $('musicVolumeValue');
 const helpScenarioButtons = document.querySelectorAll('[data-help-scenario]');
@@ -393,18 +392,15 @@ function bindUi() {
     else await startMusicSource();
   });
   musicDelayInput?.addEventListener('input', () => {
-    state.musicSyncAuto = false;
+    musicDelayManuallyAdjusted = true;
     state.musicDelayMs = clamp(Number(musicDelayInput.value), 0, 500);
+    updateMusicAudioParams();
     renderMusicSyncUi();
   });
   musicDelayInput?.addEventListener('change', () => {
     state.musicDelayMs = clamp(Number(musicDelayInput.value), 0, 500);
     updateMusicAudioParams();
     saveState();
-  });
-  musicSyncAutoBtn?.addEventListener('click', () => {
-    state.musicSyncAuto = true;
-    refreshAutoMusicDelay();
   });
   musicVolumeInput?.addEventListener('input', () => {
     state.musicVolume = clamp(Number(musicVolumeInput.value) / 100, 0, 1);
@@ -1149,7 +1145,8 @@ function connectMusicGraph() {
   musicDelayNode.connect(musicGainNode);
   musicGainNode.connect(mixNode);
   updateMixHeadroom();
-  if (state.musicSyncAuto) refreshAutoMusicDelay();
+  musicDelayManuallyAdjusted = false;
+  refreshInitialMusicDelay();
 }
 
 function disconnectMusicGraph() {
@@ -1211,8 +1208,8 @@ function estimatedAutoMusicDelayMs() {
   return calculateAutoMusicDelayMs(micLatencyMs, musicLatencyMs, workletBufferMs);
 }
 
-function refreshAutoMusicDelay() {
-  if (!state.musicSyncAuto) return;
+function refreshInitialMusicDelay() {
+  if (musicDelayManuallyAdjusted) return;
   state.musicDelayMs = estimatedAutoMusicDelayMs();
   updateMusicAudioParams();
   renderMusicSyncUi();
@@ -1248,7 +1245,6 @@ function renderMusicControls() {
   if (!musicSourceBtn) return;
   const captureSupported = Boolean(navigator.mediaDevices?.getDisplayMedia);
   state.voiceVolume = clamp(Number.isFinite(Number(state.voiceVolume)) ? Number(state.voiceVolume) : DEFAULTS.voiceVolume, 0, 1);
-  state.musicSyncAuto = state.musicSyncAuto !== false;
   state.musicDelayMs = clamp(Number(state.musicDelayMs) || 0, 0, 500);
   state.musicVolume = clamp(Number.isFinite(Number(state.musicVolume)) ? Number(state.musicVolume) : DEFAULTS.musicVolume, 0, 1);
   voiceVolumeInput.value = `${Math.round(state.voiceVolume * 100)}`;
@@ -1270,12 +1266,10 @@ function renderMusicControls() {
 }
 
 function renderMusicSyncUi() {
-  if (!musicDelayInput || !musicDelayValue || !musicSyncAutoBtn) return;
+  if (!musicDelayInput || !musicDelayValue) return;
   state.musicDelayMs = clamp(Number(state.musicDelayMs) || 0, 0, 500);
   musicDelayInput.value = `${state.musicDelayMs}`;
   musicDelayValue.textContent = `${Math.round(state.musicDelayMs)} ms`;
-  musicSyncAutoBtn.classList.toggle('active', state.musicSyncAuto);
-  musicSyncAutoBtn.setAttribute('aria-pressed', `${state.musicSyncAuto}`);
 }
 
 function createAudioContext() {
@@ -1431,7 +1425,7 @@ function handleWorkletMessage(data) {
     guard: Number.isFinite(data.guard) ? data.guard : latestStats.guard
   };
   statsReceived = true;
-  if (!hadBufferStats && state.musicSyncAuto && musicStream) refreshAutoMusicDelay();
+  if (!hadBufferStats && !musicDelayManuallyAdjusted && musicStream) refreshInitialMusicDelay();
   const clipping = latestStats.clip >= 0.96 || latestStats.peak >= 0.98;
   const mixLimiting = Number(masterLimiterNode?.reduction || 0) < -1;
   const howling = latestStats.guard < 0.82;
