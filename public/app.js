@@ -15,6 +15,9 @@ const DEFAULTS = {
   presetDefaultsVersion: PRESET_DEFAULTS_VERSION,
   analyzerEnabled: false,
   analyzerPreferenceSet: false,
+  voiceVolume: 1,
+  musicDelayMs: 100,
+  musicVolume: 0.7,
   micDeviceId: 'default',
   outputDeviceId: ''
 };
@@ -106,7 +109,7 @@ const PRESETS = {
     bypassed: { ...DEFAULTS.bypassed, echo: true, reverb: true, double: true }
   },
   preset1: {
-    label: 'Preset 1',
+    label: 'My 1',
     params: { mic: 0.5, echo: 0.18, reverb: 0.14, room: 0.5, wet: 0.58, tone: 0.54, air: 0.16, stable: 0.42, double: 0.04 },
     reverbDetail: { selectedBandId: 'band-1', bands: [
       { id: 'band-1', freq: 2100, gain: 1.8, q: 0.74 },
@@ -115,13 +118,13 @@ const PRESETS = {
     bypassed: { ...DEFAULTS.bypassed }
   },
   preset2: {
-    label: 'Preset 2',
+    label: 'My 2',
     params: { mic: 0.48, echo: 0.06, reverb: 0.06, room: 0.4, wet: 0.42, tone: 0.62, air: 0.2, stable: 0.58, double: 0 },
     reverbDetail: { selectedBandId: 'band-1', bands: [{ id: 'band-1', freq: 1800, gain: 1.0, q: 0.7 }] },
     bypassed: { ...DEFAULTS.bypassed, double: true }
   },
   preset3: {
-    label: 'Preset 3',
+    label: 'My 3',
     params: { mic: 0.5, echo: 0.34, reverb: 0.36, room: 0.8, wet: 0.78, tone: 0.48, air: 0.22, stable: 0.38, double: 0.14 },
     reverbDetail: { selectedBandId: 'band-2', bands: [
       { id: 'band-1', freq: 760, gain: 1.6, q: 0.64 },
@@ -138,7 +141,14 @@ let sourceNode = null;
 let workletNode = null;
 let analyserNode = null;
 let mediaStream = null;
+let musicStream = null;
 let outputDestination = null;
+let mixNode = null;
+let masterLimiterNode = null;
+let voiceGainNode = null;
+let musicSourceNode = null;
+let musicDelayNode = null;
+let musicGainNode = null;
 let contextSinkActive = false;
 let contextSinkPreselected = false;
 let contextSinkId = '';
@@ -153,6 +163,9 @@ let clipUntil = 0;
 let warningLabel = 'CLIP';
 let supportMessage = '';
 let runtimeMessage = '';
+let inputQualityMessage = '';
+let musicErrorMessage = '';
+let musicSourceSurface = '';
 let availableMicDeviceIds = new Set();
 let availableOutputDeviceIds = new Set();
 
@@ -186,6 +199,20 @@ const reverbFreqInput = $('reverbFreqInput');
 const reverbGainInput = $('reverbGainInput');
 const reverbQInput = $('reverbQInput');
 const quickToneStatuses = document.querySelectorAll('[data-quick-tone-status]');
+const musicCard = $('musicCard');
+const musicControls = $('musicControls');
+const musicSourceBtn = $('musicSourceBtn');
+const musicStatus = $('musicStatus');
+const voiceVolumeInput = $('voiceVolumeInput');
+const voiceVolumeValue = $('voiceVolumeValue');
+const musicDelayInput = $('musicDelayInput');
+const musicDelayValue = $('musicDelayValue');
+const musicVolumeInput = $('musicVolumeInput');
+const musicVolumeValue = $('musicVolumeValue');
+const helpScenarioButtons = document.querySelectorAll('[data-help-scenario]');
+const helpScenarioPanels = document.querySelectorAll('[data-help-panel]');
+const helpPlatformButtons = document.querySelectorAll('[data-help-platform]');
+const helpPlatformPanels = document.querySelectorAll('[data-platform-panel]');
 
 init();
 
@@ -198,7 +225,9 @@ async function init() {
   setRunState('idle', 'READY');
   checkSupport();
   renderAnalyzerVisibility();
+  renderMusicControls();
   renderRuntimeStats();
+  selectHelpPlatform(isMacPlatform() ? 'mac' : 'windows');
   await registerServiceWorker();
   showFirstRunNotice();
   await enumerateDevices();
@@ -256,7 +285,7 @@ function checkSupport() {
 }
 
 function renderBanner() {
-  const message = runtimeMessage || supportMessage;
+  const message = runtimeMessage || inputQualityMessage || supportMessage;
   supportBanner.textContent = message;
   supportBanner.dataset.tone = runtimeMessage ? 'error' : 'warn';
   supportBanner.classList.toggle('hidden', !message);
@@ -296,6 +325,12 @@ function bindUi() {
   $('settingsBtn').addEventListener('click', () => $('settingsDialog').showModal());
   $('helpBtn').addEventListener('click', () => $('helpDialog').showModal());
   $('quickSetupBtn').addEventListener('click', () => $('quickSetupDialog').showModal());
+  helpScenarioButtons.forEach((button) => {
+    button.addEventListener('click', () => selectHelpScenario(button.dataset.helpScenario));
+  });
+  helpPlatformButtons.forEach((button) => {
+    button.addEventListener('click', () => selectHelpPlatform(button.dataset.helpPlatform));
+  });
   document.querySelectorAll('[data-quick-tone]').forEach((button) => {
     button.addEventListener('click', () => applyQuickTone(button.dataset.quickTone));
   });
@@ -326,6 +361,7 @@ function bindUi() {
   micSelect.addEventListener('change', async () => {
     state.micDeviceId = micSelect.value;
     saveState();
+    updateInputQualityWarning();
     if (running) await restartAudio();
   });
   outputSelect.addEventListener('change', async () => {
@@ -344,7 +380,51 @@ function bindUi() {
     if (running) await restartAudio();
   });
   presetSelect.addEventListener('change', () => applyPreset(presetSelect.value));
+  voiceVolumeInput?.addEventListener('input', () => {
+    state.voiceVolume = clamp(Number(voiceVolumeInput.value) / 100, 0, 1);
+    updateVoiceAudioParam();
+    renderMusicControls();
+    saveState();
+  });
+  musicSourceBtn?.addEventListener('click', async () => {
+    if (musicStream) stopMusicSource();
+    else await startMusicSource();
+  });
+  musicDelayInput?.addEventListener('input', () => {
+    state.musicDelayMs = clamp(Number(musicDelayInput.value), 0, 500);
+    updateMusicAudioParams();
+    renderMusicSyncUi();
+  });
+  musicDelayInput?.addEventListener('change', () => {
+    state.musicDelayMs = clamp(Number(musicDelayInput.value), 0, 500);
+    updateMusicAudioParams();
+    saveState();
+  });
+  musicVolumeInput?.addEventListener('input', () => {
+    state.musicVolume = clamp(Number(musicVolumeInput.value) / 100, 0, 1);
+    updateMusicAudioParams();
+    renderMusicControls();
+    saveState();
+  });
   window.addEventListener('resize', drawAnalyzerIdle);
+}
+
+function selectHelpScenario(scenario) {
+  helpScenarioButtons.forEach((button) => {
+    button.setAttribute('aria-selected', `${button.dataset.helpScenario === scenario}`);
+  });
+  helpScenarioPanels.forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.helpPanel !== scenario);
+  });
+}
+
+function selectHelpPlatform(platform) {
+  helpPlatformButtons.forEach((button) => {
+    button.setAttribute('aria-selected', `${button.dataset.helpPlatform === platform}`);
+  });
+  helpPlatformPanels.forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.platformPanel !== platform);
+  });
 }
 
 function showFirstRunNotice() {
@@ -906,6 +986,15 @@ async function enumerateDevices() {
   availableOutputDeviceIds = new Set(outputs.map(d => d.deviceId).filter(Boolean));
   fillSelect(micSelect, inputs, 'Default Microphone', state.micDeviceId, '前回選択したマイク');
   fillSelect(outputSelect, outputs, 'Default Output', state.outputDeviceId || 'default', '前回選択した出力');
+  updateInputQualityWarning();
+}
+
+function updateInputQualityWarning(label = micSelect.selectedOptions?.[0]?.textContent || '') {
+  const bluetoothMic = /airpods|bluetooth|hands[ -]?free|ag audio|galaxy buds|pixel buds|beats/i.test(label);
+  inputQualityMessage = bluetoothMic
+    ? 'Bluetoothイヤホンのマイクを使うと音楽が通話音質になります。InputはPC内蔵マイクかUSBマイクを選んでください。'
+    : '';
+  renderBanner();
 }
 
 function fillSelect(select, devices, defaultLabel, selectedId, missingLabel) {
@@ -957,6 +1046,7 @@ async function startAudio() {
       setRunState('starting', 'Defaultで起動中');
     }
     mediaStream = await openMicStream(micDeviceId);
+    updateInputQualityWarning(mediaStream.getAudioTracks()[0]?.label || '');
     await applyLowLatencyTrackConstraints(mediaStream);
     setRunState('starting', '音声準備中');
     await enumerateDevices();
@@ -966,7 +1056,14 @@ async function startAudio() {
     sourceNode = audioContext.createMediaStreamSource(mediaStream);
     workletNode = new AudioWorkletNode(audioContext, 'easyknob-processor', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
     outputDestination = audioContext.createMediaStreamDestination();
+    mixNode = audioContext.createGain();
+    masterLimiterNode = createMasterLimiter(audioContext);
+    voiceGainNode = audioContext.createGain();
     sourceNode.connect(workletNode);
+    workletNode.connect(voiceGainNode);
+    voiceGainNode.connect(mixNode);
+    mixNode.connect(masterLimiterNode);
+    updateVoiceAudioParam();
     monitor.srcObject = outputDestination.stream;
     monitor.muted = false;
     const outputReady = await applyOutputDevice({ allowFallback: true });
@@ -979,6 +1076,7 @@ async function startAudio() {
     startBtn.disabled = false;
     startBtn.textContent = 'OFF';
     startBtn.classList.add('active');
+    renderMusicControls();
     setRunState('live', 'LIVE');
     if (!outputReady) {
       showRuntimeError('選択したOutputへ切り替えられなかったため、Default Outputで起動しました。ブラウザの出力先選択を確認してください。');
@@ -991,6 +1089,158 @@ async function startAudio() {
     setRunState('error', 'ERROR');
     showRuntimeError(message);
   }
+}
+
+async function startMusicSource() {
+  if (!running || !audioContext || !mixNode || !navigator.mediaDevices?.getDisplayMedia) return;
+  musicErrorMessage = '';
+  musicSourceBtn.disabled = true;
+  musicStatus.dataset.state = 'starting';
+  musicStatus.textContent = '選択中';
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true,
+      systemAudio: 'include',
+      windowAudio: 'window',
+      surfaceSwitching: 'include',
+      selfBrowserSurface: 'exclude'
+    });
+    if (!stream.getAudioTracks().length) {
+      stream.getTracks().forEach(track => track.stop());
+      throw new DOMException('共有音声が選択されていません。', 'NotFoundError');
+    }
+    stopMusicSource();
+    musicStream = stream;
+    musicSourceSurface = stream.getVideoTracks()[0]?.getSettings?.().displaySurface || '';
+    connectMusicGraph();
+    const capturedStream = stream;
+    stream.getTracks().forEach((track) => {
+      track.addEventListener('ended', () => {
+        if (musicStream === capturedStream) stopMusicSource();
+      }, { once: true });
+    });
+    renderMusicControls();
+  } catch (error) {
+    if (error?.name !== 'NotAllowedError' && error?.name !== 'AbortError') {
+      musicErrorMessage = '音声を共有できませんでした。「音声を共有」をONにして選び直してください。';
+    } else {
+      musicErrorMessage = '';
+    }
+  } finally {
+    renderMusicControls();
+  }
+}
+
+function connectMusicGraph() {
+  if (!musicStream || !audioContext || !mixNode) return;
+  disconnectMusicGraph();
+  musicSourceNode = audioContext.createMediaStreamSource(musicStream);
+  musicDelayNode = audioContext.createDelay(0.5);
+  musicGainNode = audioContext.createGain();
+  updateMusicAudioParams();
+  musicSourceNode.connect(musicDelayNode);
+  musicDelayNode.connect(musicGainNode);
+  musicGainNode.connect(mixNode);
+  updateMixHeadroom();
+  state.musicDelayMs = DEFAULTS.musicDelayMs;
+  updateMusicAudioParams();
+  renderMusicSyncUi();
+  saveState();
+}
+
+function disconnectMusicGraph() {
+  try { musicSourceNode?.disconnect(); } catch {}
+  try { musicDelayNode?.disconnect(); } catch {}
+  try { musicGainNode?.disconnect(); } catch {}
+  musicSourceNode = null;
+  musicDelayNode = null;
+  musicGainNode = null;
+}
+
+function stopMusicSource() {
+  const stream = musicStream;
+  musicStream = null;
+  disconnectMusicGraph();
+  stream?.getTracks().forEach(track => track.stop());
+  musicErrorMessage = '';
+  musicSourceSurface = '';
+  updateMixHeadroom();
+  renderMusicControls();
+}
+
+function updateMixHeadroom() {
+  if (!mixNode || !audioContext) return;
+  const now = audioContext.currentTime;
+  mixNode.gain.cancelScheduledValues(now);
+  mixNode.gain.setTargetAtTime(musicStream ? 0.8 : 1, now, 0.02);
+}
+
+function updateMusicAudioParams() {
+  const delay = clamp(Number(state.musicDelayMs) || 0, 0, 500) / 1000;
+  const volume = clamp(Number(state.musicVolume), 0, 1);
+  const now = audioContext?.currentTime || 0;
+  if (musicDelayNode) musicDelayNode.delayTime.setValueAtTime(delay, now);
+  if (musicGainNode) {
+    musicGainNode.gain.cancelScheduledValues(now);
+    musicGainNode.gain.setTargetAtTime(Number.isFinite(volume) ? volume : DEFAULTS.musicVolume, now, 0.015);
+  }
+}
+
+function updateVoiceAudioParam() {
+  const volume = clamp(Number(state.voiceVolume), 0, 1);
+  const now = audioContext?.currentTime || 0;
+  if (!voiceGainNode) return;
+  voiceGainNode.gain.cancelScheduledValues(now);
+  voiceGainNode.gain.setTargetAtTime(Number.isFinite(volume) ? volume : DEFAULTS.voiceVolume, now, 0.015);
+}
+
+function createMasterLimiter(context) {
+  const limiter = context.createDynamicsCompressor();
+  limiter.threshold.value = -1.5;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 8;
+  limiter.attack.value = 0.001;
+  limiter.release.value = 0.12;
+  return limiter;
+}
+
+function musicSourceLabel(surface) {
+  if (surface === 'browser') return 'WEB';
+  if (surface === 'window') return 'APP';
+  if (surface === 'monitor') return 'PC全体';
+  return '接続中';
+}
+
+function renderMusicControls() {
+  if (!musicSourceBtn) return;
+  const captureSupported = Boolean(navigator.mediaDevices?.getDisplayMedia);
+  state.voiceVolume = clamp(Number.isFinite(Number(state.voiceVolume)) ? Number(state.voiceVolume) : DEFAULTS.voiceVolume, 0, 1);
+  state.musicDelayMs = clamp(Number(state.musicDelayMs) || 0, 0, 500);
+  state.musicVolume = clamp(Number.isFinite(Number(state.musicVolume)) ? Number(state.musicVolume) : DEFAULTS.musicVolume, 0, 1);
+  voiceVolumeInput.value = `${Math.round(state.voiceVolume * 100)}`;
+  voiceVolumeValue.textContent = `${Math.round(state.voiceVolume * 100)}%`;
+  musicVolumeInput.value = `${Math.round(state.musicVolume * 100)}`;
+  renderMusicSyncUi();
+  musicVolumeValue.textContent = `${Math.round(state.musicVolume * 100)}%`;
+  musicSourceBtn.disabled = !running || !captureSupported;
+  musicCard.dataset.bgm = musicStream ? 'on' : 'off';
+  musicControls.classList.toggle('hidden', !musicStream);
+  musicSourceBtn.classList.toggle('active', Boolean(musicStream));
+  musicSourceBtn.textContent = musicStream ? '解除' : '音源を選ぶ';
+  musicStatus.dataset.state = musicStream ? 'live' : (musicErrorMessage ? 'error' : 'idle');
+  musicStatus.dataset.source = musicStream ? musicSourceSurface : '';
+  musicStatus.textContent = musicStream
+    ? musicSourceLabel(musicSourceSurface)
+    : (musicErrorMessage ? '音声なし' : (!captureSupported ? '非対応' : (running ? '未接続' : 'OFF')));
+  musicStatus.title = musicSourceSurface === 'monitor' ? 'VRChatなどPC全体の音も含まれます' : '';
+}
+
+function renderMusicSyncUi() {
+  if (!musicDelayInput || !musicDelayValue) return;
+  state.musicDelayMs = clamp(Number(state.musicDelayMs) || 0, 0, 500);
+  musicDelayInput.value = `${state.musicDelayMs}`;
+  musicDelayValue.textContent = `${Math.round(state.musicDelayMs)} ms`;
 }
 
 function createAudioContext() {
@@ -1093,9 +1343,9 @@ function startupErrorMessage(error) {
 }
 
 function connectOutputGraph() {
-  if (!audioContext || !workletNode || !outputDestination) return;
+  if (!audioContext || !masterLimiterNode || !outputDestination) return;
   const target = useDirectOutputRoute() || contextSinkActive ? audioContext.destination : outputDestination;
-  try { workletNode.disconnect(); } catch {}
+  try { masterLimiterNode.disconnect(); } catch {}
   if (analyserNode) {
     try { analyserNode.disconnect(); } catch {}
     analyserNode = null;
@@ -1104,11 +1354,11 @@ function connectOutputGraph() {
     analyserNode = audioContext.createAnalyser();
     analyserNode.fftSize = 1024;
     analyserNode.smoothingTimeConstant = 0.72;
-    workletNode.connect(analyserNode);
+    masterLimiterNode.connect(analyserNode);
     analyserNode.connect(target);
     startAnalyzer();
   } else {
-    workletNode.connect(target);
+    masterLimiterNode.connect(target);
     stopAnalyzer();
     drawAnalyzerIdle();
   }
@@ -1146,11 +1396,12 @@ function handleWorkletMessage(data) {
   };
   statsReceived = true;
   const clipping = latestStats.clip >= 0.96 || latestStats.peak >= 0.98;
+  const mixLimiting = Number(masterLimiterNode?.reduction || 0) < -1;
   const howling = latestStats.guard < 0.82;
   if (howling) {
     warningLabel = 'HOWL';
     clipUntil = performance.now() + 900;
-  } else if (clipping) {
+  } else if (clipping || mixLimiting) {
     warningLabel = 'CLIP';
     clipUntil = performance.now() + 900;
   }
@@ -1170,10 +1421,14 @@ async function stopAudio({ showIdle = true } = {}) {
   clipUntil = 0;
   warningLabel = 'CLIP';
   stopAnalyzer();
+  stopMusicSource();
   if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
   try { if (sourceNode) sourceNode.disconnect(); } catch {}
   try { if (workletNode) workletNode.disconnect(); } catch {}
   try { if (analyserNode) analyserNode.disconnect(); } catch {}
+  try { if (mixNode) mixNode.disconnect(); } catch {}
+  try { if (masterLimiterNode) masterLimiterNode.disconnect(); } catch {}
+  try { if (voiceGainNode) voiceGainNode.disconnect(); } catch {}
   if (audioContext) await audioContext.close().catch(() => {});
   monitor.pause();
   monitor.srcObject = null;
@@ -1183,6 +1438,9 @@ async function stopAudio({ showIdle = true } = {}) {
   analyserNode = null;
   mediaStream = null;
   outputDestination = null;
+  mixNode = null;
+  masterLimiterNode = null;
+  voiceGainNode = null;
   contextSinkActive = false;
   contextSinkPreselected = false;
   contextSinkId = '';
@@ -1191,6 +1449,7 @@ async function stopAudio({ showIdle = true } = {}) {
     clearRuntimeError();
   }
   renderRuntimeStats();
+  renderMusicControls();
   drawAnalyzerIdle();
 }
 
@@ -1659,16 +1918,17 @@ function normalizePreset(key) {
   return PRESETS[key] ? key : DEFAULTS.preset;
 }
 
-function qualitySampleRate(q) {
-  if (q === 'light') return 32000;
-  if (q === 'balanced') return 44100;
+function qualitySampleRate() {
+  // Keep voice and captured music at the standard rate used by Discord/VRChat.
+  // Quality changes effect complexity, not the entire mix sample rate.
   return 48000;
 }
 
 function qualityLatency(q) {
-  if (q === 'light') return 0.008;
-  if (q === 'balanced') return 0.004;
-  return 0.0015;
+  if (q === 'light') return 0.012;
+  if (q === 'balanced') return 0.008;
+  if (q === 'high') return 0.006;
+  return 0.004;
 }
 
 function preferredInputLatency() {
@@ -1677,6 +1937,10 @@ function preferredInputLatency() {
 
 function isWindowsPlatform() {
   return /Windows|Win32|Win64|WOW64/i.test(`${navigator.userAgent} ${navigator.platform || ''}`);
+}
+
+function isMacPlatform() {
+  return /Macintosh|MacIntel|MacPPC|Mac68K/i.test(`${navigator.userAgent} ${navigator.platform || ''}`);
 }
 
 function clamp(v, lo, hi) {
